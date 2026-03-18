@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
@@ -42,17 +43,22 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+          className="flex items-center gap-2.5 transition-opacity hover:opacity-80 shrink-0"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white font-bold text-sm shadow-md">
-            Y
-          </div>
-          <span className="hidden font-bold text-lg sm:block">
+          <Image 
+            src="/logo-horizontal.png" 
+            alt="YRU Community Logo" 
+            width={40} 
+            height={40} 
+            className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-xl shadow-sm dark:shadow-none transition-all dark:brightness-110"
+            priority
+          />
+          <span className="hidden font-bold text-lg sm:block bg-clip-text text-transparent bg-linear-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)]">
             {APP_NAME}
           </span>
         </Link>

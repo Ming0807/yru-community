@@ -45,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" suppressHydrationWarning>
+    <html lang="th" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className={`${prompt.variable} font-sans antialiased bg-background text-foreground`}>
         <ThemeProvider
           attribute="class"
