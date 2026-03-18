@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MessageCircle, ArrowBigUp, Eye, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { timeAgo } from '@/lib/utils';
@@ -10,14 +13,21 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post }: PostCardProps) {
+  const router = useRouter();
   const category = CATEGORIES.find(
     (c) => c.slug === post.category?.slug
   ) ?? post.category;
 
+  const handleNavigate = () => {
+    router.push(`/post/${post.id}`);
+  };
+
   return (
-    <Link href={`/post/${post.id}`} className="block group">
-      <article className="rounded-xl border border-border/60 bg-card p-4 transition-all duration-200 hover:border-[var(--color-yru-pink)]/30 hover:shadow-md hover:shadow-[var(--color-yru-pink)]/5 animate-fade-in-up">
-        {/* Top row: Category + Anonymous + Time */}
+    <article 
+      onClick={handleNavigate}
+      className="cursor-pointer rounded-xl border border-border/60 bg-card p-4 transition-all duration-200 hover:border-[var(--color-yru-pink)]/30 hover:shadow-md hover:shadow-[var(--color-yru-pink)]/5 animate-fade-in-up group block"
+    >
+      {/* Top row: Category + Anonymous + Time */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
           {category && (
             <Badge
@@ -44,29 +54,47 @@ export default function PostCard({ post }: PostCardProps) {
           </span>
         </div>
 
-        {/* Title */}
-        <h3 className="font-semibold text-base leading-snug group-hover:text-[var(--color-yru-pink)] transition-colors line-clamp-2">
-          {post.title}
-        </h3>
+        {/* Title and Thumbnail */}
+        <div className="flex gap-3 items-start mt-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base leading-snug group-hover:text-[var(--color-yru-pink)] transition-colors line-clamp-2">
+              {post.title}
+            </h3>
 
-        {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {post.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center rounded-md bg-[var(--color-yru-green-light)] text-[var(--color-yru-green-dark)] text-[11px] px-1.5 py-0.5"
-              >
-                #{tag}
-              </span>
-            ))}
-            {post.tags.length > 3 && (
-              <span className="text-[11px] text-muted-foreground">
-                +{post.tags.length - 3}
-              </span>
+            {/* Tags */}
+            {post.tags && post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {post.tags.slice(0, 3).map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/search?q=${encodeURIComponent(tag)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center rounded-md bg-[var(--color-yru-green-light)] text-[var(--color-yru-green-dark)] text-[11px] px-1.5 py-0.5 hover:bg-[var(--color-yru-green)] hover:text-white transition-colors"
+                    title={`ค้นหา #${tag}`}
+                  >
+                    #{tag}
+                  </Link>
+                ))}
+                {post.tags.length > 3 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    +{post.tags.length - 3}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        )}
+
+          {/* Thumbnail */}
+          {post.attachments && post.attachments.some(a => a.type === 'image') && (
+            <div className="shrink-0">
+              <img
+                src={post.attachments.find(a => a.type === 'image')?.url}
+                alt=""
+                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-border/50"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Bottom stats */}
         <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground">
@@ -84,6 +112,5 @@ export default function PostCard({ post }: PostCardProps) {
           </span>
         </div>
       </article>
-    </Link>
   );
 }

@@ -55,11 +55,14 @@ export interface Comment {
   id: string;
   post_id: string;
   author_id: string;
+  parent_id: string | null;
   content: string;
   is_anonymous: boolean;
   created_at: string;
   // Joined
   author?: Profile;
+  // Client-side grouped
+  replies?: Comment[];
 }
 
 export interface Vote {

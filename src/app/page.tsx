@@ -1,12 +1,13 @@
-import { createClient } from '@/lib/supabase/server';
+import { Suspense } from 'react';
+import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
 import CategoryTabs from '@/components/category/CategoryTabs';
-import PostCard from '@/components/post/PostCard';
+import RightSidebar from '@/components/layout/RightSidebar';
 import FAB from '@/components/FAB';
-import { POSTS_PER_PAGE } from '@/lib/constants';
+import Feed from '@/components/post/Feed';
+import PostSkeleton from '@/components/post/PostSkeleton';
 import type { SortOption } from '@/types';
-import Link from 'next/link';
 
 interface HomePageProps {
   searchParams: Promise<{ sort?: string; page?: string }>;
@@ -16,28 +17,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const sort = (params.sort as SortOption) ?? 'latest';
   const page = parseInt(params.page ?? '1', 10);
-  const offset = (page - 1) * POSTS_PER_PAGE;
-
-  const supabase = await createClient();
-
-  // Build query
-  let query = supabase
-    .from('posts')
-    .select('*, author:profiles(*), category:categories(*)', { count: 'exact' });
-
-  // Sort
-  if (sort === 'top') {
-    query = query.order('vote_count', { ascending: false });
-  } else if (sort === 'unanswered') {
-    query = query.eq('comment_count', 0).order('created_at', { ascending: false });
-  } else {
-    query = query.order('created_at', { ascending: false });
-  }
-
-  query = query.range(offset, offset + POSTS_PER_PAGE - 1);
-
-  const { data: posts, count } = await query;
-  const totalPages = Math.ceil((count ?? 0) / POSTS_PER_PAGE);
 
   const sortOptions = [
     { value: 'latest', label: '🕐 ล่าสุด' },
@@ -49,73 +28,51 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="mx-auto max-w-3xl pb-24 sm:pb-8">
-        {/* Category Tabs */}
-        <CategoryTabs />
-
-        {/* Sort Options */}
-        <div className="flex items-center gap-2 px-4 pb-3">
-          {sortOptions.map((opt) => (
-            <Link
-              key={opt.value}
-              href={`/?sort=${opt.value}`}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                sort === opt.value
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {opt.label}
-            </Link>
-          ))}
-        </div>
-
-        {/* Posts */}
-        <div className="space-y-3 px-4">
-          {posts && posts.length > 0 ? (
-            posts.map((post) => <PostCard key={post.id} post={post} />)
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <span className="text-5xl mb-4">📭</span>
-              <h3 className="font-semibold text-lg mb-1">ยังไม่มีกระทู้</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                เป็นคนแรกที่ตั้งกระทู้เลย!
-              </p>
-              <Link
-                href="/post/create"
-                className="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] px-6 py-2.5 text-sm font-medium text-white shadow-md hover:opacity-90 transition-opacity"
-              >
-                ✏️ ตั้งกระทู้ใหม่
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 px-4 py-8">
-            {page > 1 && (
-              <Link
-                href={`/?sort=${sort}&page=${page - 1}`}
-                className="rounded-lg bg-muted px-4 py-2 text-sm hover:bg-muted/80 transition-colors"
-              >
-                ← ก่อนหน้า
-              </Link>
-            )}
-            <span className="text-sm text-muted-foreground">
-              หน้า {page} / {totalPages}
-            </span>
-            {page < totalPages && (
-              <Link
-                href={`/?sort=${sort}&page=${page + 1}`}
-                className="rounded-lg bg-muted px-4 py-2 text-sm hover:bg-muted/80 transition-colors"
-              >
-                ถัดไป →
-              </Link>
-            )}
+      <div className="mx-auto flex max-w-[1200px] items-start gap-8 pt-6 px-4 pb-24 sm:pb-8">
+        <main className="flex-1 min-w-0">
+          {/* Category Tabs */}
+          <div className="-mx-4 sm:mx-0">
+            <CategoryTabs />
           </div>
-        )}
-      </main>
+
+          {/* Sort Options */}
+          <div className="flex items-center gap-2 pb-3 mt-4">
+            {sortOptions.map((opt) => (
+              <Link
+                key={opt.value}
+                href={`/?sort=${opt.value}`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  sort === opt.value
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {opt.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Feed with Suspense */}
+          <div className="mt-2 min-h-[500px]">
+            <Suspense
+              key={`${sort}-${page}`}
+              fallback={
+                <div className="space-y-3">
+                  <PostSkeleton />
+                  <PostSkeleton />
+                  <PostSkeleton />
+                  <PostSkeleton />
+                  <PostSkeleton />
+                </div>
+              }
+            >
+              <Feed sort={sort} page={page} />
+            </Suspense>
+          </div>
+        </main>
+
+        <RightSidebar />
+      </div>
 
       <FAB />
       <MobileNav />
