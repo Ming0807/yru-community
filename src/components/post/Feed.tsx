@@ -31,13 +31,20 @@ export default async function Feed({ sort, page }: FeedProps) {
   query = query.range(offset, offset + POSTS_PER_PAGE - 1);
 
   const { data: posts, count } = await query;
-  const totalPages = Math.ceil((count ?? 0) / POSTS_PER_PAGE);
+
+  // Fetch active feed ads
+  const { data: ads } = await supabase
+    .from('ads')
+    .select('*')
+    .eq('is_active', true)
+    .eq('position', 'feed');
 
   return (
     <InfiniteFeed
       initialPosts={(posts as Post[]) || []}
       totalCount={count ?? 0}
       sort={sort}
+      ads={(ads as any[]) || []}
     />
   );
 }

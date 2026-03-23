@@ -3,10 +3,11 @@ import { ArrowBigUp, MessageCircle, TrendingUp, ExternalLink, ShieldCheck } from
 import { createClient } from '@/lib/supabase/server';
 import { timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import SidebarAdCard from '@/components/ads/SidebarAdCard';
 import { CATEGORIES } from '@/lib/constants';
 
-// Revalidate this component periodically or let Next.js handle it
-export const revalidate = 3600; // 1 hour
+// Revalidate this component periodically (every minute)
+export const revalidate = 60; // 1 minute
 
 export default async function RightSidebar() {
   const supabase = await createClient();
@@ -23,6 +24,18 @@ export default async function RightSidebar() {
     .gte('created_at', sevenDaysAgo.toISOString())
     .order('vote_count', { ascending: false })
     .limit(5);
+
+  // Fetch active sidebar ads
+  const { data: sidebarAds } = await supabase
+    .from('ads')
+    .select('*')
+    .eq('is_active', true)
+    .eq('position', 'sidebar');
+
+  // Pick a random ad if available
+  const randomSidebarAd = sidebarAds && sidebarAds.length > 0 
+    ? sidebarAds[Math.floor(Math.random() * sidebarAds.length)] 
+    : null;
 
   return (
     <aside className="hidden lg:block w-[320px] shrink-0 space-y-6 sticky top-20 h-max">
@@ -74,6 +87,11 @@ export default async function RightSidebar() {
           )}
         </div>
       </div>
+
+      {/* Ad Block (Sidebar) */}
+      {randomSidebarAd && (
+        <SidebarAdCard ad={randomSidebarAd as any} />
+      )}
 
       {/* Rules & Links Block */}
       <div className="rounded-xl border border-border/60 bg-card p-5 shadow-xs text-sm">

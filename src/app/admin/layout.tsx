@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, LayoutDashboard, Users, MessageSquare, Flag, FolderTree, ArrowLeft } from 'lucide-react';
+import { Shield, LayoutDashboard, Users, MessageSquare, Flag, FolderTree, ArrowLeft, Megaphone } from 'lucide-react';
 
 export default async function AdminLayout({
   children,
@@ -31,6 +31,7 @@ export default async function AdminLayout({
 
   const navLinks = [
     { name: 'ภาพรวม', href: '/admin', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { name: 'โฆษณา', href: '/admin/ads', icon: <Megaphone className="w-4 h-4" /> },
     { name: 'จัดการผู้ใช้', href: '/admin/users', icon: <Users className="w-4 h-4" /> },
     { name: 'จัดการเนื้อหา', href: '/admin/content', icon: <MessageSquare className="w-4 h-4" /> },
     { name: 'จัดการรายงาน', href: '/admin/reports', icon: <Flag className="w-4 h-4" /> },

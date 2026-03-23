@@ -9,6 +9,8 @@ export interface Profile {
   faculty: string | null;
   major: string | null;
   avatar_url: string | null;
+  role?: 'admin' | 'user';
+  status?: 'active' | 'suspended' | 'banned';
   created_at: string;
   updated_at: string;
 }
@@ -97,4 +99,19 @@ export interface PostFilters {
   sort?: SortOption;
   search?: string;
   page?: number;
+}
+
+export interface Ad {
+  id: string;
+  campaign_name: string;
+  image_url: string;
+  target_url: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  impressions: number;
+  clicks: number;
+  position: 'feed' | 'sidebar';
+  revenue: number;
+  created_at: string;
 }

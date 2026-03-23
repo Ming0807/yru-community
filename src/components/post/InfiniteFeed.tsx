@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import PostCard from '@/components/post/PostCard';
+import FeedAdCard from '@/components/ads/FeedAdCard';
 import { createClient } from '@/lib/supabase/client';
 import { POSTS_PER_PAGE } from '@/lib/constants';
-import type { Post, SortOption } from '@/types';
+import type { Post, SortOption, Ad } from '@/types';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -13,9 +14,10 @@ interface InfiniteFeedProps {
   initialPosts: Post[];
   totalCount: number;
   sort: SortOption;
+  ads?: Ad[];
 }
 
-export default function InfiniteFeed({ initialPosts, totalCount, sort }: InfiniteFeedProps) {
+export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] }: InfiniteFeedProps) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,9 +89,17 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort }: Infinit
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {posts.map((post, index) => {
+          const showAd = ads.length > 0 && index > 0 && index % 8 === 3;
+          const adToDisplay = showAd ? ads[index % ads.length] : null;
+
+          return (
+            <div key={post.id} className="space-y-3">
+              {showAd && adToDisplay && <FeedAdCard ad={adToDisplay} />}
+              <PostCard post={post} />
+            </div>
+          );
+        })}
       </div>
 
       {hasMore && (
