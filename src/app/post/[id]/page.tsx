@@ -1,7 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import DOMPurify from 'isomorphic-dompurify';
+// ✅ เปลี่ยนมาใช้ sanitize-html แทน isomorphic-dompurify
+import sanitizeHtml from 'sanitize-html'; 
+import { generateHTML } from '@tiptap/html';
+import StarterKit from '@tiptap/starter-kit';
+import TipTapLink from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import Youtube from '@tiptap/extension-youtube';
 import {
   ArrowLeft,
   Eye,
@@ -22,6 +31,7 @@ import ShareButton from '@/components/post/ShareButton';
 import CommentSection from '@/components/post/CommentSection';
 import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
+import PostOptions from '@/components/post/PostOptions'; // ย้าย import มารวมกัน
 import { timeAgo, formatFileSize } from '@/lib/utils';
 import type { Metadata } from 'next';
 
@@ -138,66 +148,48 @@ export default async function PostPage({ params }: PostPageProps) {
     currentProfile = data;
   }
 
-  // Render TipTap content as HTML (simple conversion)
+  const editorExtensions = [
+    StarterKit,
+    TipTapLink.configure({
+      HTMLAttributes: {
+        class: 'text-(--color-yru-pink) underline cursor-pointer',
+      },
+    }),
+    Underline,
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+    }),
+    TextStyle,
+    Color,
+    Youtube.configure({
+      HTMLAttributes: {
+        class: 'w-full aspect-video rounded-lg mt-4 mb-4',
+      },
+    }),
+  ];
+
+  // Render TipTap content as HTML safely
   const renderContent = (content: Record<string, unknown>) => {
     if (!content || !('content' in content)) return '';
-
-    const nodes = (content as { content?: Array<Record<string, unknown>> })
-      .content;
-    if (!nodes) return '';
-
-    const rawHtml = nodes
-      .map((node) => {
-        if (node.type === 'paragraph') {
-          const textContent = (
-            node.content as Array<{ text?: string; marks?: Array<{ type: string }> }>
-          )
-            ?.map((child) => {
-              let text = child.text ?? '';
-              if (child.marks) {
-                child.marks.forEach((mark) => {
-                  if (mark.type === 'bold') text = `<strong>${text}</strong>`;
-                  if (mark.type === 'italic') text = `<em>${text}</em>`;
-                });
-              }
-              return text;
-            })
-            .join('') ?? '';
-          return `<p>${textContent || '<br/>'}</p>`;
-        }
-        if (node.type === 'bulletList') {
-          const items = (node.content as Array<Record<string, unknown>>)
-            ?.map((item) => {
-              const text = (
-                (item.content as Array<Record<string, unknown>>)?.[0]
-                  ?.content as Array<{ text?: string }>
-              )
-                ?.map((c) => c.text)
-                .join('');
-              return `<li>${text}</li>`;
-            })
-            .join('');
-          return `<ul class="list-disc pl-5 space-y-1">${items}</ul>`;
-        }
-        if (node.type === 'orderedList') {
-          const items = (node.content as Array<Record<string, unknown>>)
-            ?.map((item) => {
-              const text = (
-                (item.content as Array<Record<string, unknown>>)?.[0]
-                  ?.content as Array<{ text?: string }>
-              )
-                ?.map((c) => c.text)
-                .join('');
-              return `<li>${text}</li>`;
-            })
-            .join('');
-          return `<ol class="list-decimal pl-5 space-y-1">${items}</ol>`;
-        }
-        return '';
-      })
-      .join('');
+    try {
+      const rawHtml = generateHTML(content, editorExtensions);
       
-    return DOMPurify.sanitize(rawHtml);
+      // ✅ ใช้ sanitize-html และตั้งค่าอนุญาต tag/attribute ที่จำเป็นสำหรับ Tiptap
+      return sanitizeHtml(rawHtml, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+          'iframe', 'img', 'u', 's', 'h1', 'h2', 'h3'
+        ]),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          '*': ['style', 'class'],
+          'iframe': ['src', 'width', 'height', 'allowfullscreen', 'frameborder', 'allow'],
+          'a': ['href', 'target', 'rel']
+        }
+      });
+    } catch (e) {
+      console.error('Error generating HTML from formatting', e);
+      return '';
+    }
   };
 
   const attachments = (post.attachments as Array<{
@@ -245,14 +237,13 @@ export default async function PostPage({ params }: PostPageProps) {
             </span>
           </div>
 
-          {/* Title */}
-          <h1 className="text-2xl font-bold leading-tight mb-4">
-            {post.title}
-          </h1>
-
-import PostOptions from '@/components/post/PostOptions';
-
-// ... (will need to add the import at the top, since I can't easily jump to line 1 and also replace line 227 without multiple commands, I will use multi_replace_file_content)
+          {/* Title & Options */}
+          <div className="flex justify-between items-start gap-4 mb-4">
+            <h1 className="text-2xl font-bold leading-tight">
+              {post.title}
+            </h1>
+            <PostOptions postId={post.id} authorId={post.author?.id} />
+          </div>
 
           {/* Content */}
           <div
