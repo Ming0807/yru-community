@@ -40,6 +40,8 @@ export default function AdminAdsPage() {
     position: 'feed' as 'feed' | 'sidebar',
     revenue: 0,
     is_active: true,
+    target_tags: [] as string[],
+    target_categories: [] as number[],
   });
 
   const supabase = createClient();
@@ -153,6 +155,8 @@ export default function AdminAdsPage() {
       position: 'feed',
       revenue: 0,
       is_active: true,
+      target_tags: [],
+      target_categories: [],
     });
   };
 
@@ -165,6 +169,8 @@ export default function AdminAdsPage() {
       position: ad.position,
       revenue: ad.revenue,
       is_active: ad.is_active,
+      target_tags: ad.target_tags || [],
+      target_categories: ad.target_categories || [],
     });
     setIsDialogOpen(true);
   };
@@ -224,108 +230,163 @@ export default function AdminAdsPage() {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button className="rounded-xl whitespace-nowrap gap-2 bg-[var(--color-yru-pink)] hover:bg-[var(--color-yru-pink-dark)] focus:ring-[var(--color-yru-pink)]">
+              <Button className="rounded-xl whitespace-nowrap gap-2 bg-(--color-yru-pink) hover:bg-(--color-yru-pink-dark) focus:ring-(--color-yru-pink)">
                 <Plus className="w-4 h-4" /> สร้างโฆษณาใหม่
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[750px]">
               <DialogHeader>
                 <DialogTitle>{editingId ? 'แก้ไขโฆษณา' : 'สร้างโฆษณาใหม่'}</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">ชื่อแคมเปญ / โฆษณา</label>
-                  <Input 
-                    value={formData.campaign_name} 
-                    onChange={e => setFormData({...formData, campaign_name: e.target.value})}
-                    placeholder="เช่น โปรโมชั่นร้านคาเฟ่..."
-                  />
-                </div>
-                
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">รูปภาพแบนเนอร์</label>
-                  <label className={`relative w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground bg-muted/20 transition-all ${!uploading ? 'cursor-pointer hover:bg-muted/40 hover:border-[var(--color-yru-pink)]/50' : 'cursor-wait opacity-80'} overflow-hidden group`}>
-                    {uploading ? (
-                      <div className="flex flex-col items-center justify-center z-10 bg-background/80 absolute inset-0 backdrop-blur-sm">
-                        <Loader2 className="w-8 h-8 mb-3 animate-spin text-[var(--color-yru-pink)]" />
-                        <span className="text-xs font-semibold text-[var(--color-yru-pink)]">กำลังอัปโหลดรูปภาพ...</span>
-                      </div>
-                    ) : formData.image_url ? (
-                      <>
-                        <Image src={formData.image_url} alt="Preview" fill className="object-cover" sizes="(max-width: 500px) 100vw, 500px" />
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 backdrop-blur-[2px]">
-                          <ImageIcon className="w-8 h-8 mb-2 text-white" />
-                          <span className="text-xs text-white font-medium">คลิกเพื่อเปลี่ยนรูปภาพใหม่</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="p-3 bg-background rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform duration-300">
-                          <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-[var(--color-yru-pink)] transition-colors" />
-                        </div>
-                        <span className="text-sm font-medium text-foreground">คลิกเพื่ออัปโหลดรูปภาพ</span>
-                        <span className="text-xs text-muted-foreground mt-1">ไฟล์ JPG, PNG, WEBP (ไม่เกิน 5MB)</span>
-                      </>
-                    )}
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleFileUpload}
-                      disabled={uploading}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">ลิงก์ปลายทาง (Target URL)</label>
-                  <Input 
-                    value={formData.target_url} 
-                    onChange={e => setFormData({...formData, target_url: e.target.value})}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-6 py-4">
+                {/* Left Column */}
+                <div className="space-y-4">
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">ตำแหน่งแสดงผล</label>
-                    <select 
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={formData.position}
-                      onChange={e => setFormData({...formData, position: e.target.value as 'feed'|'sidebar'})}
-                    >
-                      <option value="feed">ในโพสต์ฟีด (Feed)</option>
-                      <option value="sidebar">แถบด้านข้าง (Sidebar)</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">รายได้ / มูลค่า (บาท)</label>
+                    <label className="text-sm font-medium">ชื่อแคมเปญ / โฆษณา</label>
                     <Input 
-                      type="number"
-                      value={formData.revenue} 
-                      onChange={e => setFormData({...formData, revenue: parseInt(e.target.value) || 0})}
-                      placeholder="0"
+                      value={formData.campaign_name} 
+                      onChange={e => setFormData({...formData, campaign_name: e.target.value})}
+                      placeholder="เช่น โปรโมชั่นร้านคาเฟ่..."
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">รูปภาพแบนเนอร์</label>
+                    <label className={`relative w-full h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground bg-muted/20 transition-all ${!uploading ? 'cursor-pointer hover:bg-muted/40 hover:border-yru-pink/50' : 'cursor-wait opacity-80'} overflow-hidden group`}>
+                      {uploading ? (
+                        <div className="flex flex-col items-center justify-center z-10 bg-background/80 absolute inset-0 backdrop-blur-sm">
+                          <Loader2 className="w-8 h-8 mb-3 animate-spin text-(--color-yru-pink)" />
+                          <span className="text-xs font-semibold text-(--color-yru-pink)">กำลังอัปโหลดรูปภาพ...</span>
+                        </div>
+                      ) : formData.image_url ? (
+                        <>
+                          <Image src={formData.image_url} alt="Preview" fill className="object-cover" sizes="(max-width: 500px) 100vw, 500px" />
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 backdrop-blur-[2px]">
+                            <ImageIcon className="w-8 h-8 mb-2 text-white" />
+                            <span className="text-xs text-white font-medium">คลิกเพื่อเปลี่ยนรูปภาพใหม่</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-3 bg-background rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform duration-300">
+                            <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-(--color-yru-pink) transition-colors" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground">คลิกเพื่ออัปโหลดรูปภาพ</span>
+                          <span className="text-xs text-muted-foreground mt-1 text-center px-4">ไฟล์ JPG, PNG, WEBP (ไม่เกิน 5MB)<br/>สัดส่วน 16:9 แนะนำ 1200x675px</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">ลิงก์ปลายทาง (Target URL)</label>
+                    <Input 
+                      value={formData.target_url} 
+                      onChange={e => setFormData({...formData, target_url: e.target.value})}
+                      placeholder="https://..."
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-2">
-                  <input 
-                    type="checkbox" 
-                    id="is_active" 
-                    checked={formData.is_active}
-                    onChange={e => setFormData({...formData, is_active: e.target.checked})}
-                    className="w-4 h-4 rounded border-gray-300 text-[var(--color-yru-pink)] focus:ring-[var(--color-yru-pink)]"
-                  />
-                  <label htmlFor="is_active" className="text-sm font-medium cursor-pointer">
-                    เปิดใช้งานโฆษณานี้ทันที
-                  </label>
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">ตำแหน่งแสดงผล</label>
+                      <select 
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={formData.position}
+                        onChange={e => setFormData({...formData, position: e.target.value as 'feed'|'sidebar'})}
+                      >
+                        <option value="feed">ในโพสต์ฟีด (Feed)</option>
+                        <option value="sidebar">แถบด้านข้าง (Sidebar)</option>
+                      </select>
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">รายได้ / มูลค่า (บาท)</label>
+                      <Input 
+                        type="number"
+                        value={formData.revenue} 
+                        onChange={e => setFormData({...formData, revenue: parseInt(e.target.value) || 0})}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">หมวดหมู่เป้าหมาย (เว้นว่างเพื่อแสดงทุกหมวด)</label>
+                    <div className="flex flex-wrap gap-2 p-3 border rounded-xl bg-muted/10">
+                      {[
+                        { id: 1, name: 'เรื่องทั่วไป' },
+                        { id: 2, name: 'การเรียน' },
+                        { id: 3, name: 'รีวิววิชา' },
+                        { id: 4, name: 'ถาม-ตอบ' },
+                        { id: 5, name: 'ซื้อขาย' }
+                      ].map(cat => (
+                        <label key={cat.id} className="flex items-center gap-1.5 text-sm cursor-pointer border px-2.5 py-1.5 rounded-lg hover:bg-muted/50 bg-background transition-colors shadow-sm">
+                          <input
+                            type="checkbox"
+                            checked={formData.target_categories.includes(cat.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({ ...formData, target_categories: [...formData.target_categories, cat.id] });
+                              } else {
+                                setFormData({ ...formData, target_categories: formData.target_categories.filter(id => id !== cat.id) });
+                              }
+                            }}
+                            className="w-4 h-4 text-yru-pink rounded focus:ring-yru-pink/50 cursor-pointer"
+                          />
+                          {cat.name}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-yru-pink-dark flex items-center gap-1">
+                      แท็กเป้าหมาย (คั่นด้วยลูกน้ำ ",")
+                    </label>
+                    <Input 
+                      value={formData.target_tags.join(', ')} 
+                      onChange={e => {
+                        const tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
+                        setFormData({...formData, target_tags: tags});
+                      }}
+                      placeholder="เช่น หอพัก, ร้านอาหาร, สอบ"
+                      className="border-yru-pink/30 focus-visible:ring-yru-pink/20"
+                    />
+                    <p className="text-xs text-muted-foreground -mt-1 leading-relaxed">
+                      โฆษณาจะถูกแสดงเมื่อผู้ใช้กำลังดูกระทู้ที่มีแท็กตรงกัน
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-4 p-3 border rounded-xl bg-yru-green/5 border-yru-green/20">
+                    <input 
+                      type="checkbox" 
+                      id="is_active" 
+                      checked={formData.is_active}
+                      onChange={e => setFormData({...formData, is_active: e.target.checked})}
+                      className="w-4 h-4 rounded border-gray-300 text-yru-green focus:ring-yru-green cursor-pointer"
+                    />
+                    <label htmlFor="is_active" className="text-sm font-semibold cursor-pointer text-foreground">
+                      เปิดใช้งานโฆษณานี้ทันที
+                    </label>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>ยกเลิก</Button>
-                <Button onClick={saveAd} disabled={uploading} className="bg-[var(--color-yru-pink)] hover:bg-[var(--color-yru-pink-dark)]">
-                  {uploading ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border/40">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl px-6">ยกเลิก</Button>
+                <Button onClick={saveAd} disabled={uploading} className="rounded-xl px-6 bg-linear-to-r from-yru-pink to-yru-pink-dark hover:opacity-90 transition-opacity text-white shadow-md">
+                  {uploading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> กำลังบันทึก...</>
+                  ) : editingId ? 'บันทึกการเปลี่ยนแปลง' : 'สร้างโฆษณา'}
                 </Button>
               </div>
             </DialogContent>
@@ -382,6 +443,12 @@ export default function AdminAdsPage() {
                         <a href={ad.target_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
                           <ExternalLink className="w-3 h-3" /> ลิงก์ปลายทาง
                         </a>
+                        {((ad.target_categories?.length || 0) > 0 || (ad.target_tags?.length || 0) > 0) && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(ad.target_categories?.length || 0) > 0 && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">หมวดหมู่เป้าหมาย: {ad.target_categories!.length}</span>}
+                            {(ad.target_tags?.length || 0) > 0 && <span className="text-[10px] bg-yru-pink/10 text-yru-pink-dark px-1.5 py-0.5 rounded">แท็กเป้าหมาย: {ad.target_tags!.length}</span>}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-4">

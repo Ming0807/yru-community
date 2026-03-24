@@ -46,10 +46,10 @@ export default function SidebarAdCard({ ad }: SidebarAdCardProps) {
   };
 
   return (
-    <div
+    <div 
       ref={adRef}
+      className="relative rounded-2xl overflow-hidden border border-border/40 bg-card group cursor-pointer transition-all duration-300 hover:-translate-y-[2px] hover:border-[var(--color-yru-pink)]/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
       onClick={handleLinkClick}
-      className="relative bg-card rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-border/60 group block"
     >
       <div className="absolute top-2 right-2 z-10 bg-black/60 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-2 py-1 rounded shadow-sm">
         Sponsored

@@ -91,6 +91,21 @@ export interface Report {
   created_at: string;
 }
 
+export interface Notification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: 'COMMENT' | 'REPLY';
+  post_id: string;
+  comment_id: string;
+  is_read: boolean;
+  created_at: string;
+  // Joined
+  actor?: Profile;
+  post?: { title: string };
+  comment?: { content: string };
+}
+
 // Sort & Filter
 export type SortOption = 'latest' | 'top' | 'unanswered';
 
@@ -113,5 +128,7 @@ export interface Ad {
   clicks: number;
   position: 'feed' | 'sidebar';
   revenue: number;
+  target_tags?: string[];
+  target_categories?: number[];
   created_at: string;
 }

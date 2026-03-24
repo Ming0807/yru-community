@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
-import { Prompt } from "next/font/google";
+import { Inter, Noto_Sans_Thai } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { UserProvider } from "@/components/UserProvider";
 import "./globals.css";
 
-const prompt = Prompt({
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const notoSansThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
   weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-prompt",
+  variable: "--font-noto-thai",
   display: "swap",
 });
 
@@ -46,7 +52,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className={`${prompt.variable} font-sans antialiased bg-background text-foreground`}>
+      <body className={`${inter.variable} ${notoSansThai.variable} font-sans antialiased bg-background text-foreground selection:bg-[var(--color-yru-pink)]/20`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

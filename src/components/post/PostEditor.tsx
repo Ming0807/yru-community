@@ -35,7 +35,7 @@ export default function PostEditor({ content, onChange }: PostEditorProps) {
       TipTapLink.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-[var(--color-yru-pink)] underline cursor-pointer',
+          class: 'text-(--color-yru-pink) underline cursor-pointer',
         },
       }),
     ],

@@ -22,12 +22,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+// 1. เพิ่ม SheetTitle ในการ Import
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { createClient } from '@/lib/supabase/client';
 import { APP_NAME, CATEGORIES } from '@/lib/constants';
 import type { Profile } from '@/types';
 import SearchBar from '@/components/search/SearchBar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import NotificationDropdown from '@/components/layout/NotificationDropdown';
 
 import { useUser } from '@/components/UserProvider';
 
@@ -43,7 +45,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
+    <header className="sticky top-0 z-50 w-full glass transition-colors duration-200">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link
@@ -98,7 +100,9 @@ export default function Header() {
           {loading ? (
             <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
           ) : user ? (
-            <DropdownMenu>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <NotificationDropdown userId={user.id} />
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
@@ -137,6 +141,7 @@ export default function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           ) : (
             <Link href="/login">
               <Button
@@ -158,6 +163,10 @@ export default function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72 pt-12">
+              
+              {/* 2. เพิ่ม SheetTitle และใช้คลาส sr-only เพื่อซ่อนจากการมองเห็น */}
+              <SheetTitle className="sr-only">เมนูนำทาง</SheetTitle>
+              
               <nav className="flex flex-col gap-1">
                 {CATEGORIES.map((cat) => (
                   <Link

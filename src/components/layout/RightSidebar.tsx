@@ -9,7 +9,13 @@ import { CATEGORIES } from '@/lib/constants';
 // Revalidate this component periodically (every minute)
 export const revalidate = 60; // 1 minute
 
-export default async function RightSidebar() {
+export default async function RightSidebar({ 
+  categoryId, 
+  tags = [] 
+}: { 
+  categoryId?: number; 
+  tags?: string[]; 
+} = {}) {
   const supabase = await createClient();
 
   // Fetch top 5 trending posts (most votes/comments in the last 7 days)
@@ -32,21 +38,39 @@ export default async function RightSidebar() {
     .eq('is_active', true)
     .eq('position', 'sidebar');
 
-  // Pick a random ad if available
-  const randomSidebarAd = sidebarAds && sidebarAds.length > 0 
-    ? sidebarAds[Math.floor(Math.random() * sidebarAds.length)] 
-    : null;
+  // Targeting Logic
+  let validAds = sidebarAds || [];
+  const targetedAds = validAds.filter(ad => {
+    const matchCat = (ad.target_categories?.length || 0) > 0 && categoryId && ad.target_categories!.includes(categoryId);
+    const matchTag = (ad.target_tags?.length || 0) > 0 && tags.length > 0 && tags.some(t => ad.target_tags!.includes(t));
+    return matchCat || matchTag;
+  });
+
+  if (targetedAds.length > 0) {
+    validAds = targetedAds;
+  } else {
+    // Fallback to generic ads
+    validAds = validAds.filter(ad => 
+      (ad.target_categories?.length || 0) === 0 &&
+      (ad.target_tags?.length || 0) === 0
+    );
+  }
+
+  // Pick a random ad from the valid set
+  const randomSidebarAd = validAds.length > 0 
+    ? validAds[Math.floor(Math.random() * validAds.length)] 
+    : (sidebarAds && sidebarAds.length > 0 ? sidebarAds[Math.floor(Math.random() * sidebarAds.length)] : null);
 
   return (
     <aside className="hidden lg:block w-[320px] shrink-0 space-y-6 sticky top-20 h-max">
       {/* Trending Block */}
-      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-xs">
+      <div className="rounded-2xl border border-border/40 bg-card p-6 card-shadow">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <TrendingUp className="h-4 w-4 text-[var(--color-yru-pink)]" />
           กำลังมาแรงในสัปดาห์นี้
         </h3>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {trendingPosts && trendingPosts.length > 0 ? (
             trendingPosts.map((post, idx) => {
               const category = CATEGORIES.find((c) => c.slug === CATEGORIES[post.category_id - 1]?.slug) || CATEGORIES[0];
@@ -54,9 +78,9 @@ export default async function RightSidebar() {
                 <Link
                   key={post.id}
                   href={`/post/${post.id}`}
-                  className="group block space-y-1.5"
+                  className="group block p-2.5 -mx-2.5 rounded-xl hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-3">
                     <span className="text-sm font-bold text-muted-foreground/50 w-4 text-center">
                       {idx + 1}
                     </span>
@@ -94,7 +118,7 @@ export default async function RightSidebar() {
       )}
 
       {/* Rules & Links Block */}
-      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-xs text-sm">
+      <div className="rounded-2xl border border-border/40 bg-card p-6 card-shadow text-sm">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-3">
           <ShieldCheck className="h-4 w-4 text-[var(--color-yru-green-dark)]" />
           กฎระเบียบชุมชน

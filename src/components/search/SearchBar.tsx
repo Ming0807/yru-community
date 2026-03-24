@@ -1,11 +1,11 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, Suspense } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
-export default function SearchBar() {
+function SearchInput() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
@@ -29,5 +29,18 @@ export default function SearchBar() {
         className="pl-9 pr-4 h-10 rounded-full bg-muted/50 border-transparent focus:border-border focus:bg-background transition-colors"
       />
     </form>
+  );
+}
+
+export default function SearchBar() {
+  return (
+    <Suspense fallback={
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input type="search" placeholder="ค้นหากระทู้, ชีทสรุป, รีวิว..." disabled className="pl-9 pr-4 h-10 rounded-full bg-muted/50 border-transparent opacity-70" />
+      </div>
+    }>
+      <SearchInput />
+    </Suspense>
   );
 }

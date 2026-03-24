@@ -45,7 +45,7 @@ export default function FeedAdCard({ ad }: FeedAdCardProps) {
   return (
     <article 
       ref={adRef}
-      className="bg-card rounded-xl overflow-hidden shadow-sm border border-border/50 hover:border-border transition-colors cursor-pointer relative group flex flex-col sm:flex-row gap-4"
+      className="bg-card rounded-2xl overflow-hidden border border-border/40 transition-all duration-300 hover:-translate-y-[2px] hover:border-[var(--color-yru-pink)]/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer relative group flex flex-col sm:flex-row gap-4"
       onClick={handleLinkClick}
     >
       <div className="w-full sm:w-1/3 h-40 sm:h-auto bg-muted flex items-center justify-center overflow-hidden shrink-0 border-r border-border/30 relative">

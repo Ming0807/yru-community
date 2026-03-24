@@ -90,8 +90,24 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
     <div className="space-y-4">
       <div className="space-y-3">
         {posts.map((post, index) => {
+          // Ad Selection Logic: Favor ads that target the current post's category or tags
           const showAd = ads.length > 0 && index > 0 && index % 8 === 3;
-          const adToDisplay = showAd ? ads[index % ads.length] : null;
+          let adToDisplay = null;
+          if (showAd) {
+             const targetedAds = ads.filter(ad => {
+                const matchCat = (ad.target_categories?.length || 0) > 0 && ad.target_categories!.includes(post.category_id);
+                const matchTag = (ad.target_tags?.length || 0) > 0 && post.tags && post.tags.some(t => ad.target_tags!.includes(t));
+                return matchCat || matchTag;
+             });
+             
+             // Fallback to generic ads if no targeted ad matches
+             const validAds = targetedAds.length > 0 ? targetedAds : ads.filter(ad => 
+                (ad.target_categories?.length || 0) === 0 &&
+                (ad.target_tags?.length || 0) === 0
+             );
+             
+             adToDisplay = validAds.length > 0 ? validAds[index % validAds.length] : (ads.length > 0 ? ads[index % ads.length] : null);
+          }
 
           return (
             <div key={post.id} className="space-y-3">

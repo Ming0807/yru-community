@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { UPLOAD_LIMITS } from '@/lib/constants';
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -18,6 +19,13 @@ export async function POST(request: Request) {
     }
 
     if (type === 'image') {
+      if (!UPLOAD_LIMITS.ALLOWED_IMAGE_TYPES.includes(file.type as typeof UPLOAD_LIMITS.ALLOWED_IMAGE_TYPES[number])) {
+        return NextResponse.json({ error: 'ประเภทไฟล์ภาพไม่รองรับ' }, { status: 400 });
+      }
+      if (file.size > UPLOAD_LIMITS.MAX_IMAGE_SIZE) {
+        return NextResponse.json({ error: 'ไฟล์ภาพขนาดใหญ่เกินไป (สูงสุด 5MB)' }, { status: 400 });
+      }
+
       // Convert to buffer for Cloudinary
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);

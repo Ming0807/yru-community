@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import DOMPurify from 'isomorphic-dompurify';
 import {
   ArrowLeft,
   Eye,
@@ -35,15 +36,39 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: post } = await supabase
     .from('posts')
-    .select('title, content_text')
+    .select('title, content_text, attachments')
     .eq('id', id)
     .single();
 
   if (!post) return { title: 'ไม่พบกระทู้' };
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yru-community.vercel.app';
+  const ogImage = post.attachments?.find((a: any) => a.type === 'image')?.url || `${siteUrl}/logo-horizontal.png`;
+  const description = post.content_text?.slice(0, 160) || 'พูดคุยแลกเปลี่ยนเรื่องราวในมหาวิทยาลัยราชภัฏยะลา';
+
   return {
-    title: post.title,
-    description: post.content_text?.slice(0, 160),
+    title: `${post.title} | YRU Community`,
+    description,
+    openGraph: {
+      title: `${post.title} | YRU Community`,
+      description,
+      url: `${siteUrl}/post/${id}`,
+      type: 'website',
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${post.title} | YRU Community`,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
@@ -121,7 +146,7 @@ export default async function PostPage({ params }: PostPageProps) {
       .content;
     if (!nodes) return '';
 
-    return nodes
+    const rawHtml = nodes
       .map((node) => {
         if (node.type === 'paragraph') {
           const textContent = (
@@ -171,6 +196,8 @@ export default async function PostPage({ params }: PostPageProps) {
         return '';
       })
       .join('');
+      
+    return DOMPurify.sanitize(rawHtml);
   };
 
   const attachments = (post.attachments as Array<{
