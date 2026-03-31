@@ -76,7 +76,7 @@ export default function ProfilePage() {
         .eq('user_id', user.id);
 
       if (bookmarks && bookmarks.length > 0) {
-        const postIds = bookmarks.map((b) => b.post_id);
+        const postIds = bookmarks.map((b: { post_id: string }) => b.post_id);
         const { data: bPosts } = await supabase
           .from('posts')
           .select('*, author:profiles(*), category:categories(*)')

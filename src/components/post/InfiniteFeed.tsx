@@ -55,8 +55,8 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
       if (data && data.length > 0) {
         setPosts((prev) => {
           // Filter out any duplicates just in case new posts were added while scrolling
-          const existingIds = new Set(prev.map(p => p.id));
-          const newUnique = data.filter(p => !existingIds.has(p.id));
+          const existingIds = new Set(prev.map((p: Post) => p.id));
+          const newUnique = (data as Post[]).filter((p: Post) => !existingIds.has(p.id));
           return [...prev, ...newUnique];
         });
         setPage(nextPage);

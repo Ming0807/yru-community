@@ -49,9 +49,9 @@ export default function NotificationDropdown({ userId }: { userId: string }) {
     };
   }, [userId]);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (retries = 2) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select(`
           *,
@@ -63,11 +63,24 @@ export default function NotificationDropdown({ userId }: { userId: string }) {
         .order('created_at', { ascending: false })
         .limit(20);
 
+      if (error) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 600));
+          return fetchNotifications(retries - 1);
+        }
+        console.warn('Error fetching notifications:', error.message);
+        return;
+      }
+
       if (data) {
         setNotifications(data as unknown as Notification[]);
-        setUnreadCount(data.filter((n) => !n.is_read).length);
+        setUnreadCount(data.filter((n: { is_read: boolean }) => !n.is_read).length);
       }
     } catch (error) {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 600));
+        return fetchNotifications(retries - 1);
+      }
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);

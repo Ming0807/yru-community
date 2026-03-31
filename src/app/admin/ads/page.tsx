@@ -50,17 +50,29 @@ export default function AdminAdsPage() {
     fetchAds();
   }, []);
 
-  const fetchAds = async () => {
+  const fetchAds = async (retries = 3) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('ads')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      toast.error('ไม่สามารถโหลดข้อมูลโฆษณาได้');
-    } else {
-      setAds(data || []);
+      if (error) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+          return fetchAds(retries - 1);
+        }
+        toast.error('ไม่สามารถโหลดข้อมูลโฆษณาได้');
+      } else {
+        setAds(data || []);
+      }
+    } catch {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+        return fetchAds(retries - 1);
+      }
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     }
     setLoading(false);
   };

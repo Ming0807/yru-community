@@ -27,17 +27,30 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (retries = 3) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      toast.error('ไม่สามารถโหลดข้อมูลผู้ใช้ได้');
-    } else {
-      setUsers(data || []);
+      if (error) {
+        if (retries > 0) {
+          console.warn('[AdminUsers] Fetch error, retrying...', error.message);
+          await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+          return fetchUsers(retries - 1);
+        }
+        toast.error('ไม่สามารถโหลดข้อมูลผู้ใช้ได้');
+      } else {
+        setUsers(data || []);
+      }
+    } catch (err) {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+        return fetchUsers(retries - 1);
+      }
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     }
     setLoading(false);
   };

@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -29,33 +30,60 @@ export function useUser() {
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
-  const fetchProfile = async () => {
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+  const fetchProfile = useCallback(async (retries = 2) => {
+    try {
+      const supabase = createClient();
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authUser) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      if (authError) {
+        // Auth error — might be expired session, don't retry
+        console.warn('[UserProvider] Auth error:', authError.message);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
 
-      setUser(profile);
-    } else {
+      if (authUser) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+
+        if (profileError && retries > 0) {
+          // Profile fetch failed — might be transient, retry after short delay
+          console.warn('[UserProvider] Profile fetch error, retrying...', profileError.message);
+          await new Promise((r) => setTimeout(r, 500));
+          return fetchProfile(retries - 1);
+        }
+
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('[UserProvider] Unexpected error:', err);
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 500));
+        return fetchProfile(retries - 1);
+      }
       setUser(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchProfile();
 
+    const supabase = createClient();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event: string, session: { user: { id: string } } | null) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
       } else if (session?.user) {
@@ -69,8 +97,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchProfile]);
 
   return (
     <UserContext.Provider value={{ user, loading, refresh: fetchProfile }}>

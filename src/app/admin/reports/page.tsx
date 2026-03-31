@@ -30,22 +30,34 @@ export default function AdminReportsPage() {
     fetchReports();
   }, []);
 
-  const fetchReports = async () => {
+  const fetchReports = async (retries = 3) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('reports')
-      .select(`
-        *,
-        reporter:profiles!reporter_id(display_name),
-        post:posts(title),
-        comment:comments(content)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select(`
+          *,
+          reporter:profiles!reporter_id(display_name),
+          post:posts(title),
+          comment:comments(content)
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      toast.error('ไม่สามารถโหลดข้อมูลรายงานได้');
-    } else {
-      setReports(data as unknown as ReportItem[]);
+      if (error) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+          return fetchReports(retries - 1);
+        }
+        toast.error('ไม่สามารถโหลดข้อมูลรายงานได้');
+      } else {
+        setReports(data as unknown as ReportItem[]);
+      }
+    } catch {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+        return fetchReports(retries - 1);
+      }
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     }
     setLoading(false);
   };

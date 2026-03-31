@@ -22,17 +22,29 @@ export default function AdminContentPage() {
     fetchPosts();
   }, []);
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (retries = 3) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('posts')
-      .select('*, author:profiles(*), category:categories(*)')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*, author:profiles(*), category:categories(*)')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      toast.error('ไม่สามารถโหลดข้อมูลกระทู้ได้');
-    } else {
-      setPosts(data as unknown as PostWithAuthor[]);
+      if (error) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+          return fetchPosts(retries - 1);
+        }
+        toast.error('ไม่สามารถโหลดข้อมูลกระทู้ได้');
+      } else {
+        setPosts(data as unknown as PostWithAuthor[]);
+      }
+    } catch {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+        return fetchPosts(retries - 1);
+      }
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     }
     setLoading(false);
   };

@@ -43,7 +43,8 @@ export default function AnalyticsDashboard() {
   const supabase = createClient();
 
   useEffect(() => {
-    async function fetchAnalytics() {
+    async function fetchAnalytics(retries = 3) {
+      try {
       setLoading(true);
 
       // 1. Fetch High Level Stats
@@ -53,7 +54,7 @@ export default function AnalyticsDashboard() {
       const { data: adsData } = await supabase.from('ads').select('impressions, clicks');
       let totalImp = 0;
       let totalClicks = 0;
-      adsData?.forEach(ad => {
+      adsData?.forEach((ad: { impressions: number; clicks: number }) => {
         totalImp += ad.impressions || 0;
         totalClicks += ad.clicks || 0;
       });
@@ -90,12 +91,12 @@ export default function AnalyticsDashboard() {
         daysTemp[dayStr] = { posts: 0, comments: 0 };
       }
 
-      recentPosts?.forEach(p => {
+      recentPosts?.forEach((p: { created_at: string }) => {
         const dayStr = new Date(p.created_at).toLocaleDateString('th-TH', { weekday: 'short' });
         if (daysTemp[dayStr]) daysTemp[dayStr].posts++;
       });
       
-      recentComments?.forEach(c => {
+      recentComments?.forEach((c: { created_at: string }) => {
         const dayStr = new Date(c.created_at).toLocaleDateString('th-TH', { weekday: 'short' });
         if (daysTemp[dayStr]) daysTemp[dayStr].comments++;
       });
@@ -110,7 +111,7 @@ export default function AnalyticsDashboard() {
       // 3. Category Distribution
       const { data: postsCat } = await supabase.from('posts').select('category_id');
       const catCount: Record<number, number> = {};
-      postsCat?.forEach(p => {
+      postsCat?.forEach((p: { category_id: number }) => {
         catCount[p.category_id] = (catCount[p.category_id] || 0) + 1;
       });
       
@@ -135,7 +136,7 @@ export default function AnalyticsDashboard() {
         .order('impressions', { ascending: false })
         .limit(5);
 
-      const actualAdPerf = adsPerf?.map(ad => {
+      const actualAdPerf = adsPerf?.map((ad: { id: string; campaign_name: string; impressions: number; clicks: number; is_active: boolean; image_url: string; target_tags: string[] }) => {
         const ctr = ad.impressions > 0 ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : '0.00';
         return {
           id: ad.id,
@@ -151,10 +152,20 @@ export default function AnalyticsDashboard() {
       setAdPerformanceData(actualAdPerf);
 
       setLoading(false);
+      } catch (err) {
+        if (retries > 0) {
+          console.warn('[Analytics] Fetch error, retrying...', err);
+          await new Promise((r) => setTimeout(r, 800 * (4 - retries)));
+          return fetchAnalytics(retries - 1);
+        }
+        console.error('[Analytics] Failed after retries:', err);
+        setLoading(false);
+      }
     }
 
     fetchAnalytics();
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (

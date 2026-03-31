@@ -3,6 +3,7 @@ import { Inter, Noto_Sans_Thai } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { UserProvider } from "@/components/UserProvider";
+import { PWARegistration } from "@/components/PWARegistration";
 import "./globals.css";
 
 const inter = Inter({
@@ -43,6 +44,7 @@ export const metadata: Metadata = {
     description:
       "เว็บบอร์ดสำหรับนักศึกษามหาวิทยาลัยราชภัฏยะลา แลกเปลี่ยนความรู้ รีวิววิชา ซื้อขาย หาหอพัก และสร้างเครือข่าย",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -61,6 +63,7 @@ export default function RootLayout({
         >
           <UserProvider>
             {children}
+            <PWARegistration />
           </UserProvider>
           <Toaster position="top-center" richColors />
         </ThemeProvider>
