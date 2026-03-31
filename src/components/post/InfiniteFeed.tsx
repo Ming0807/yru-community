@@ -37,6 +37,8 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
         .from('posts')
         .select('*, author:profiles(*), category:categories(*)');
 
+      query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
+
       if (sort === 'top') {
         query = query.order('vote_count', { ascending: false });
       } else if (sort === 'unanswered') {

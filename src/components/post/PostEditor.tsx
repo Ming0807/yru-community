@@ -9,6 +9,8 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Youtube from '@tiptap/extension-youtube';
+import Mention from '@tiptap/extension-mention';
+import mentionSuggestion from './mentionSuggestion';
 import {
   Bold,
   Italic,
@@ -76,6 +78,12 @@ const extensions = [
     HTMLAttributes: {
       class: 'w-full aspect-video rounded-lg mt-4 mb-4',
     },
+  }),
+  Mention.configure({
+    HTMLAttributes: {
+      class: 'text-(--color-yru-pink) bg-(--color-yru-pink)/10 px-1 rounded-md font-medium',
+    },
+    suggestion: mentionSuggestion,
   }),
 ];
 

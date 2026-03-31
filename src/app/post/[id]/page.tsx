@@ -31,7 +31,8 @@ import ShareButton from '@/components/post/ShareButton';
 import CommentSection from '@/components/post/CommentSection';
 import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
-import PostOptions from '@/components/post/PostOptions'; // ย้าย import มารวมกัน
+import PostOptions from '@/components/post/PostOptions';
+import ReactionButton from '@/components/post/ReactionButton';
 import { timeAgo, formatFileSize } from '@/lib/utils';
 import type { Metadata } from 'next';
 
@@ -242,7 +243,13 @@ export default async function PostPage({ params }: PostPageProps) {
             <h1 className="text-2xl font-bold leading-tight">
               {post.title}
             </h1>
-            <PostOptions postId={post.id} authorId={post.author?.id} />
+            <PostOptions 
+              postId={post.id} 
+              authorId={post.author?.id ?? ''} 
+              currentUserId={authUser?.id}
+              isAdmin={currentProfile?.role === 'admin'}
+              isPinned={post.is_pinned}
+            />
           </div>
 
           {/* Content */}
@@ -300,6 +307,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
+            <ReactionButton postId={post.id} userId={authUser?.id} />
             <VoteButton
               postId={post.id}
               initialVoteCount={post.vote_count}

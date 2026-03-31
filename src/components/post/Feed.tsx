@@ -20,6 +20,8 @@ export default async function Feed({ sort, page }: FeedProps) {
     .select('*, author:profiles(*), category:categories(*)', { count: 'exact' });
 
   // Sort
+  query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
+
   if (sort === 'top') {
     query = query.order('vote_count', { ascending: false });
   } else if (sort === 'unanswered') {

@@ -41,6 +41,7 @@ export interface Post {
   attachments: Attachment[];
   created_at: string;
   updated_at: string;
+  is_pinned?: boolean;
   // Joined fields
   author?: Profile;
   category?: Category;
@@ -62,6 +63,7 @@ export interface Comment {
   parent_id: string | null;
   content: string;
   is_anonymous: boolean;
+  vote_count?: number;
   created_at: string;
   // Joined
   author?: Profile;
@@ -132,5 +134,40 @@ export interface Ad {
   revenue: number;
   target_tags?: string[];
   target_categories?: number[];
+  created_at: string;
+}
+
+export interface Follow {
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+  follower?: Profile;
+  following?: Profile;
+}
+
+export interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  sender?: Profile;
+  receiver?: Profile;
+}
+
+export interface PostReaction {
+  id: string;
+  post_id: string;
+  user_id: string;
+  reaction_type: 'LIKE' | 'LOVE' | 'HAHA' | 'WOW' | 'SAD' | 'ANGRY';
+  created_at: string;
+}
+
+export interface CommentVote {
+  id: string;
+  comment_id: string;
+  user_id: string;
+  vote_type: 1 | -1;
   created_at: string;
 }

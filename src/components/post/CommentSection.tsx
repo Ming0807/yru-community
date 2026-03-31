@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, FormEvent } from 'react';
+import Link from 'next/link';
 import {
   Send,
   User,
@@ -21,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ReportDialog from '@/components/ReportDialog';
+import CommentVoteButton from '@/components/post/CommentVoteButton';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -106,7 +108,27 @@ export default function CommentSection({
 
   const [reportId, setReportId] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [userVotes, setUserVotes] = useState<Record<string, 1 | -1 | 0>>({});
   const supabase = createClient();
+
+  useEffect(() => {
+    if (currentUser) {
+      const loadVotes = async () => {
+        const { data } = await supabase
+          .from('comment_votes')
+          .select('comment_id, vote_type')
+          .eq('user_id', currentUser.id)
+          .in('comment_id', initialComments.map(c => c.id));
+        
+        if (data) {
+          const voteMap: Record<string, 1 | -1 | 0> = {};
+          data.forEach((v: any) => { voteMap[v.comment_id] = v.vote_type as 1 | -1 | 0; });
+          setUserVotes(voteMap);
+        }
+      };
+      loadVotes();
+    }
+  }, [currentUser, initialComments, supabase]);
 
   // Build the tree from flat comments
   const commentTree = useMemo(() => buildCommentTree(comments), [comments]);
@@ -234,29 +256,42 @@ export default function CommentSection({
           <div className="flex-1 min-w-0 pr-8">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">
-                {comment.is_anonymous
-                  ? 'ผู้ใช้ไม่ระบุตัวตน'
-                  : comment.author?.display_name ?? 'ผู้ใช้'}
+                {comment.is_anonymous ? (
+                  'ผู้ใช้ไม่ระบุตัวตน'
+                ) : (
+                  <Link href={`/profile/${comment.author?.id}`} className="hover:text-(--color-yru-pink) hover:underline transition-colors">
+                    {comment.author?.display_name ?? 'ผู้ใช้'}
+                  </Link>
+                )}
               </span>
               <span className="text-xs text-muted-foreground">
                 {timeAgo(comment.created_at)}
               </span>
             </div>
-            <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap break-words">
+            <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap wrap-break-word">
               {renderContent(comment.content)}
             </p>
 
-            {/* Reply Button */}
-            {currentUser && (
-              <button
-                type="button"
-                onClick={() => handleReply(comment)}
-                className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-[var(--color-yru-pink)] transition-colors"
-              >
-                <Reply className="h-3 w-3" />
-                ตอบกลับ
-              </button>
-            )}
+            {/* Actions (Vote & Reply) */}
+            <div className="mt-2 flex items-center gap-4">
+              <CommentVoteButton 
+                commentId={comment.id}
+                initialVoteCount={comment.vote_count ?? 0}
+                initialUserVote={userVotes[comment.id] ?? 0}
+                userId={currentUser?.id}
+              />
+              
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={() => handleReply(comment)}
+                  className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-(--color-yru-pink) transition-colors"
+                >
+                  <Reply className="h-3.5 w-3.5" />
+                  ตอบกลับ
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Options Dropdown */}

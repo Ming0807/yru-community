@@ -12,6 +12,7 @@ import {
   User,
   LogOut,
   LogIn,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -101,6 +102,11 @@ export default function Header() {
             <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
           ) : user ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
+              <Link href="/messages">
+                <Button variant="ghost" size="icon" className="relative rounded-full text-foreground/70 hover:text-foreground">
+                  <MessageSquare className="h-5 w-5" />
+                </Button>
+              </Link>
               <NotificationDropdown userId={user.id} />
               <DropdownMenu>
               <DropdownMenuTrigger asChild>

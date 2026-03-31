@@ -1,8 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react'; // 1. นำเข้า useState, useEffect
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, ArrowBigUp, Eye, Clock } from 'lucide-react';
+import { MessageCircle, ArrowBigUp, Eye, Clock, Pin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { timeAgo } from '@/lib/utils';
 import { CATEGORIES } from '@/lib/constants';
@@ -22,6 +23,14 @@ interface PostCardProps {
 
 export default function PostCard({ post, index = 0 }: PostCardProps) {
   const router = useRouter();
+  
+  // 2. สร้าง State เช็กว่าหน้าเว็บโหลดฝั่ง Client เสร็จหรือยัง
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const category = CATEGORIES.find(
     (c) => c.slug === post.category?.slug
   ) ?? post.category;
@@ -46,20 +55,22 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
             <span>ไม่ระบุตัวตน</span>
           </div>
         ) : post.author ? (
-          <div className="flex items-center gap-1.5 font-medium text-foreground py-0.5">
-            {post.author.avatar_url ? (
-              <img 
-                src={post.author.avatar_url} 
-                alt="" 
-                className="w-6 h-6 rounded-full object-cover ring-1 ring-border/50 transition-all group-hover:ring-2 group-hover:ring-(--color-yru-pink)/30" 
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-(--color-yru-pink)/10 text-(--color-yru-pink) flex items-center justify-center text-[10px] font-bold">
-                {post.author.display_name?.[0]?.toUpperCase() || 'U'}
-              </div>
-            )}
-            <span className="truncate max-w-[120px]">{post.author.display_name || 'สมาชิก'}</span>
-          </div>
+          <Link href={`/profile/${post.author.id}`} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1.5 font-medium text-foreground py-0.5 hover:text-(--color-yru-pink) hover:underline transition-all">
+              {post.author.avatar_url ? (
+                <img 
+                  src={post.author.avatar_url} 
+                  alt="" 
+                  className="w-6 h-6 rounded-full object-cover ring-1 ring-border/50 transition-all group-hover:ring-2 group-hover:ring-(--color-yru-pink)/30" 
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-(--color-yru-pink)/10 text-(--color-yru-pink) flex items-center justify-center text-[10px] font-bold">
+                  {post.author.display_name?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
+              <span className="truncate max-w-[120px]">{post.author.display_name || 'สมาชิก'}</span>
+            </div>
+          </Link>
         ) : null}
 
         <span className="text-muted-foreground/30">•</span>
@@ -74,9 +85,10 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           </Badge>
         )}
 
+        {/* 3. เช็ก isMounted ตรงนี้! ถ้ายืนยันว่าฝั่ง Client พร้อมแล้วค่อยคำนวณเวลา */}
         <span className="ml-auto flex items-center gap-1.5 opacity-60">
           <Clock className="h-3 w-3" />
-          {timeAgo(post.created_at)}
+          {isMounted ? timeAgo(post.created_at) : '...'}
         </span>
       </div>
 
@@ -84,6 +96,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
       <div className="flex gap-4 items-start mt-1">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-lg leading-snug text-card-foreground group-hover:text-(--color-yru-pink) transition-colors duration-200 line-clamp-2">
+            {post.is_pinned && <Pin className="h-4 w-4 inline-block mr-1.5 text-orange-500 fill-orange-500/20" />}
             {post.title}
           </h3>
 
