@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, LayoutDashboard, Users, MessageSquare, Flag, FolderTree, ArrowLeft, Megaphone, BarChart3 } from 'lucide-react';
+import { Shield, LayoutDashboard, Users, MessageSquare, Flag, FolderTree, ArrowLeft, Megaphone, BarChart3, ClipboardList } from 'lucide-react';
 
 export default async function AdminLayout({
   children,
@@ -37,6 +37,7 @@ export default async function AdminLayout({
     { name: 'จัดการรายงาน', href: '/admin/reports', icon: <Flag className="w-4 h-4" /> },
     { name: 'หมวดหมู่', href: '/admin/categories', icon: <FolderTree className="w-4 h-4" /> },
     { name: 'สถิติพฤติกรรมผู้ใช้', href: '/admin/analytics', icon: <BarChart3 className="w-4 h-4" /> },
+    { name: 'ประวัติการทำงาน', href: '/admin/audit', icon: <ClipboardList className="w-4 h-4" /> },
   ];
 
   return (

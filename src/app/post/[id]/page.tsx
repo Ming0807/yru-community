@@ -247,7 +247,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
           {/* Content */}
           <div
-            className="prose prose-sm max-w-none text-foreground/90 leading-relaxed mb-6"
+            className="post-content prose prose-sm max-w-none text-foreground/90 leading-relaxed mb-6"
             dangerouslySetInnerHTML={{
               __html: renderContent(post.content as Record<string, unknown>),
             }}
@@ -259,7 +259,7 @@ export default async function PostPage({ params }: PostPageProps) {
               {post.tags.map((tag: string) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center rounded-full bg-[var(--color-yru-green-light)] text-[var(--color-yru-green-dark)] text-xs px-2.5 py-1"
+                  className="inline-flex items-center rounded-full bg-(--color-yru-green-light) text-(--color-yru-green-dark) text-xs px-2.5 py-1"
                 >
                   #{tag}
                 </span>

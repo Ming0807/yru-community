@@ -78,7 +78,7 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
         </p>
         <Link
           href="/post/create"
-          className="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] px-6 py-2.5 text-sm font-medium text-white shadow-md hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-(--color-yru-pink) to-(--color-yru-pink-dark) px-6 py-2.5 text-sm font-medium text-white shadow-md hover:opacity-90 transition-opacity"
         >
           ✏️ ตั้งกระทู้ใหม่
         </Link>
@@ -112,7 +112,7 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
           return (
             <div key={post.id} className="space-y-3">
               {showAd && adToDisplay && <FeedAdCard ad={adToDisplay} />}
-              <PostCard post={post} />
+              <PostCard post={post} index={index} />
             </div>
           );
         })}
@@ -124,7 +124,7 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
             onClick={loadMore}
             disabled={isLoading}
             variant="outline"
-            className="rounded-full px-8 py-6 border-border/60 hover:border-[var(--color-yru-pink)]/50 hover:text-[var(--color-yru-pink)] transition-all bg-card/50 backdrop-blur shadow-xs"
+            className="rounded-full px-8 py-6 border-border/60 hover:border-(--color-yru-pink)/40 hover:text-(--color-yru-pink) transition-all bg-card/50 backdrop-blur-sm shadow-xs"
           >
             {isLoading ? (
               <>

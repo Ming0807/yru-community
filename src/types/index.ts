@@ -11,6 +11,8 @@ export interface Profile {
   avatar_url: string | null;
   role?: 'admin' | 'user';
   status?: 'active' | 'suspended' | 'banned';
+  experience_points?: number;
+  level?: number;
   created_at: string;
   updated_at: string;
 }
