@@ -21,5 +21,21 @@ export default function manifest(): MetadataRoute.Manifest {
         type: 'image/png',
       },
     ],
+    shortcuts: [
+      {
+        name: 'ตั้งกระทู้ใหม่',
+        short_name: 'ตั้งกระทู้',
+        description: 'เขียนกระทู้ใหม่ในชุมชน',
+        url: '/post/create',
+        icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+      },
+      {
+        name: 'Admin Dashboard',
+        short_name: 'แอดมิน',
+        description: 'จัดการระดับผู้ดูแลระบบ',
+        url: '/admin',
+        icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+      }
+    ]
   };
 }

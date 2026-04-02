@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { Users, FileText, MessageSquare, Flag } from 'lucide-react';
+export const dynamic = 'force-dynamic'; // <--- เติมบรรทัดนี้เพื่อปิดการทำ Cache
 
 export const metadata = {
   title: 'Admin Dashboard - YRU Community',
