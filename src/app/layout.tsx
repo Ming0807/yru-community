@@ -45,6 +45,11 @@ export const metadata: Metadata = {
       "เว็บบอร์ดสำหรับนักศึกษามหาวิทยาลัยราชภัฏยะลา แลกเปลี่ยนความรู้ รีวิววิชา ซื้อขาย หาหอพัก และสร้างเครือข่าย",
   },
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "YRU",
+  },
 };
 
 export default function RootLayout({

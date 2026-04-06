@@ -1,7 +1,7 @@
 {
   "name": "YRU Community",
   "short_name": "YRU",
-  "description": "ศูนย์กลางชุมชนนักศึกษา มหาวิทยาลัยราชภัฏยะลา",
+  "description": "ชุมชนออนไลน์สำหรับนักศึกษามหาวิทยาลัยราชภัฏยะลา",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
@@ -9,16 +9,24 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "ตั้งกระทู้ใหม่",
+      "short_name": "ตั้งกระทู้",
+      "url": "/post/create",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "categories": ["education", "social"],
