@@ -23,6 +23,7 @@ import { Search, Plus, MoreHorizontal, Image as ImageIcon, ExternalLink, Megapho
 import { toast } from 'sonner';
 import type { Ad } from '@/types';
 import Image from 'next/image';
+import { logAdminAction } from '@/lib/admin-audit';
 
 interface Props {
   initialAds: Ad[];
@@ -105,6 +106,13 @@ export default function AdminAdsClient({ initialAds }: Props) {
 
         if (error) throw error;
         setAds(prev => prev.map(a => a.id === editingId ? { ...a, ...formData } as Ad : a));
+
+        await logAdminAction('UPDATE_AD', {
+          target_type: 'ad',
+          target_id: editingId,
+          extra: { campaign_name: formData.campaign_name },
+        });
+
         toast.success('อัปเดตโฆษณาสำเร็จ');
       } else {
         const { data, error } = await supabase
@@ -115,6 +123,13 @@ export default function AdminAdsClient({ initialAds }: Props) {
 
         if (error) throw error;
         setAds(prev => [data as Ad, ...prev]);
+
+        await logAdminAction('CREATE_AD', {
+          target_type: 'ad',
+          target_id: data.id,
+          extra: { campaign_name: formData.campaign_name },
+        });
+
         toast.success('เพิ่มโฆษณาสำเร็จ');
       }
 
@@ -159,6 +174,12 @@ export default function AdminAdsClient({ initialAds }: Props) {
     try {
       const { error } = await supabase.from('ads').delete().eq('id', id);
       if (error) throw error;
+
+      await logAdminAction('DELETE_AD', {
+        target_type: 'ad',
+        target_id: id,
+      });
+
       setAds(prev => prev.filter(a => a.id !== id));
       toast.success('ลบโฆษณาเรียบร้อย');
     } catch {
@@ -175,6 +196,13 @@ export default function AdminAdsClient({ initialAds }: Props) {
 
       if (error) throw error;
       setAds(prev => prev.map(a => a.id === id ? { ...a, is_active: !currentStatus } : a));
+
+      await logAdminAction('TOGGLE_AD', {
+        target_type: 'ad',
+        target_id: id,
+        extra: { is_active: !currentStatus },
+      });
+
       toast.success(`เปลี่ยนสถานะโฆษณาเป็น ${!currentStatus ? 'เปิดใช้งาน' : 'ปิดใช้งาน'} แล้ว`);
     } catch {
       toast.error('อัปเดตสถานะไม่สำเร็จ');

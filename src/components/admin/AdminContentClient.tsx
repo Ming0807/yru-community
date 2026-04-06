@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Search, Trash2, ExternalLink, ChevronDown, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { timeAgo } from '@/lib/utils';
+import { logAdminAction } from '@/lib/admin-audit';
 
 interface ContentPost {
   id: string;
@@ -56,6 +57,11 @@ export default function AdminContentClient({ initialPosts, totalCount }: Props) 
         .eq('id', postId);
 
       if (error) throw error;
+
+      await logAdminAction('DELETE_POST', {
+        target_type: 'post',
+        target_id: postId,
+      });
 
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       toast.success('ลบกระทู้สำเร็จ');

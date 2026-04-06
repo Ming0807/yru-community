@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, GripVertical, FolderTree } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAdminAction } from '@/lib/admin-audit';
 
 interface Category {
   id: number;
@@ -72,6 +73,12 @@ export default function AdminCategoriesClient({ initialCategories }: Props) {
           .eq('id', editingId);
         if (error) throw error;
 
+        await logAdminAction('UPDATE_CATEGORY', {
+          target_type: 'category',
+          target_id: String(editingId),
+          extra: { ...formData },
+        });
+
         setCategories(prev =>
           prev.map(c => (c.id === editingId ? { ...c, ...formData } : c))
         );
@@ -83,6 +90,12 @@ export default function AdminCategoriesClient({ initialCategories }: Props) {
           .select()
           .single();
         if (error) throw error;
+
+        await logAdminAction('CREATE_CATEGORY', {
+          target_type: 'category',
+          target_id: String(data.id),
+          extra: { ...formData },
+        });
 
         setCategories(prev => [...prev, data as Category]);
         toast.success('เพิ่มหมวดหมู่สำเร็จ');
@@ -104,6 +117,11 @@ export default function AdminCategoriesClient({ initialCategories }: Props) {
         .delete()
         .eq('id', id);
       if (error) throw error;
+
+      await logAdminAction('DELETE_CATEGORY', {
+        target_type: 'category',
+        target_id: String(id),
+      });
 
       setCategories(prev => prev.filter(c => c.id !== id));
       toast.success('ลบหมวดหมู่สำเร็จ');

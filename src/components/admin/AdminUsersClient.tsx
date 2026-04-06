@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
+import { logAdminAction } from '@/lib/admin-audit';
 
 interface Props {
   initialUsers: Profile[];
@@ -43,7 +44,7 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
     setLoadingMore(false);
   };
 
-  const updateUser = async (userId: string, updates: Partial<Profile>) => {
+  const updateUser = async (userId: string, updates: Partial<Profile>, actionLabel?: string) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -55,10 +56,43 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, ...updates } : u))
       );
+
+      if (actionLabel) {
+        const user = users.find(u => u.id === userId);
+        await logAdminAction(actionLabel as any, {
+          target_type: 'user',
+          target_id: userId,
+          extra: { user_name: user?.display_name, updates },
+        });
+      }
+
       toast.success('อัปเดตข้อมูลผู้ใช้สำเร็จ');
     } catch {
       toast.error('เกิดข้อผิดพลาดในการอัปเดตข้อมูล');
     }
+  };
+
+  const handlePromoteToAdmin = async (userId: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะตั้งผู้ใช้รายนี้เป็นแอดมิน?\n\nการกระทำนี้จะให้สิทธิ์เต็มในการจัดการระบบ')) return;
+    await updateUser(userId, { role: 'admin' }, 'PROMOTE_ADMIN');
+  };
+
+  const handleDemoteFromAdmin = async (userId: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะปลดแอดมินรายนี้?')) return;
+    await updateUser(userId, { role: 'user' }, 'DEMOTE_ADMIN');
+  };
+
+  const handleBanUser = async (userId: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะแบนผู้ใช้รายนี้ถาวร?')) return;
+    await updateUser(userId, { status: 'banned' }, 'BAN_USER');
+  };
+
+  const handleSuspendUser = async (userId: string) => {
+    await updateUser(userId, { status: 'suspended' }, 'SUSPEND_USER');
+  };
+
+  const handleActivateUser = async (userId: string) => {
+    await updateUser(userId, { status: 'active' }, 'ACTIVATE_USER');
   };
 
   const filteredUsers = users.filter(
@@ -160,17 +194,17 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
                             เปลี่ยนสถานะบัญชี
                           </DropdownMenuItem>
                           {user.status !== 'active' && (
-                            <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'active' })} className="cursor-pointer gap-2 text-green-600 focus:text-green-600">
+                            <DropdownMenuItem onClick={() => handleActivateUser(user.id)} className="cursor-pointer gap-2 text-green-600 focus:text-green-600">
                               <CheckCircle className="h-4 w-4" /> ปลดแบน (Active)
                             </DropdownMenuItem>
                           )}
                           {user.status !== 'suspended' && (
-                            <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'suspended' })} className="cursor-pointer gap-2 text-orange-600 focus:text-orange-600">
+                            <DropdownMenuItem onClick={() => handleSuspendUser(user.id)} className="cursor-pointer gap-2 text-orange-600 focus:text-orange-600">
                               <Ban className="h-4 w-4" /> แบนชั่วคราว (Suspend)
                             </DropdownMenuItem>
                           )}
                           {user.status !== 'banned' && (
-                            <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'banned' })} className="cursor-pointer gap-2 text-red-600 focus:text-red-600">
+                            <DropdownMenuItem onClick={() => handleBanUser(user.id)} className="cursor-pointer gap-2 text-red-600 focus:text-red-600">
                               <Ban className="h-4 w-4" /> ถาวร (Ban)
                             </DropdownMenuItem>
                           )}
@@ -179,11 +213,11 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
                             เปลี่ยนบทบาท
                           </DropdownMenuItem>
                           {user.role !== 'admin' ? (
-                            <DropdownMenuItem onClick={() => updateUser(user.id, { role: 'admin' })} className="cursor-pointer gap-2">
+                            <DropdownMenuItem onClick={() => handlePromoteToAdmin(user.id)} className="cursor-pointer gap-2">
                               <Shield className="h-4 w-4" /> ตั้งเป็นแอดมิน
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => updateUser(user.id, { role: 'user' })} className="cursor-pointer gap-2 text-red-600 focus:text-red-600">
+                            <DropdownMenuItem onClick={() => handleDemoteFromAdmin(user.id)} className="cursor-pointer gap-2 text-red-600 focus:text-red-600">
                               <Shield className="h-4 w-4" /> ปลดแอดมิน
                             </DropdownMenuItem>
                           )}
