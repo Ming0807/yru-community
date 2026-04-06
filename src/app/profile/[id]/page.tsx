@@ -10,7 +10,8 @@ import SubscribeButton from '@/components/profile/SubscribeButton';
 import UserBadge, { ExpProgress } from '@/components/UserBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Users } from 'lucide-react';
+import Link from 'next/link';
 import type { Profile, Post } from '@/types';
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -88,13 +89,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               </div>
 
               <div className="flex items-center gap-4 mt-4">
-                <div className="text-sm">
+                <Link href={`/profile/${id}/followers`} className="text-sm hover:text-[var(--color-yru-pink)] transition-colors cursor-pointer">
                   <span className="font-bold">{followersCount || 0}</span> <span className="text-muted-foreground">ผู้ติดตาม</span>
-                </div>
-                <div className="text-sm">
+                </Link>
+                <Link href={`/profile/${id}/following`} className="text-sm hover:text-[var(--color-yru-pink)] transition-colors cursor-pointer">
                   <span className="font-bold">{followingCount || 0}</span> <span className="text-muted-foreground">กำลังติดตาม</span>
-                </div>
+                </Link>
               </div>
+
+              {profile.bio && (
+                <p className="mt-3 text-sm text-foreground/80 whitespace-pre-wrap line-clamp-3">
+                  {profile.bio}
+                </p>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-2 items-center">
                 <UserBadge level={profile.level} exp={profile.experience_points} />

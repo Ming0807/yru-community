@@ -7,13 +7,16 @@ import { createClient } from '@/lib/supabase/server';
 import UserBadge, { ExpProgress } from '@/components/UserBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, BookOpen, Bookmark } from 'lucide-react';
+import { Settings, LogOut, BookOpen, Bookmark, Activity } from 'lucide-react';
 import Link from 'next/link';
 
 // Component for rendering profile feeds, handling its own loading state
 import ProfileFeedClient from '@/components/profile/ProfileFeedClient';
 import PostCard from '@/components/post/PostCard'; // Used for type cast / initial data
-import type { Post } from '@/types';
+import PostSkeleton from '@/components/post/PostSkeleton';
+import type { Post, Comment, PostReaction } from '@/types';
+import { timeAgo } from '@/lib/utils';
+import { MessageSquare, Heart, ArrowBigUp } from 'lucide-react';
 
 export const metadata = {
   title: 'โปรไฟล์ของฉัน | YRU Community',
@@ -85,6 +88,12 @@ export default async function ProfilePage() {
                   <span className="font-medium text-foreground">{profile.faculty || 'ไม่ระบุคณะ'}</span>
                   {profile.major && <><span className="w-1 h-1 rounded-full bg-muted-foreground/30" /> <span className="text-muted-foreground">{profile.major}</span></>}
                 </div>
+
+                {profile.bio && (
+                  <p className="text-sm text-foreground/80 mt-3 px-2 line-clamp-3 whitespace-pre-wrap">
+                    {profile.bio}
+                  </p>
+                )}
               </div>
 
               <div className="w-full mt-6 space-y-4 text-left border-t border-border/50 pt-6">
@@ -96,7 +105,7 @@ export default async function ProfilePage() {
               </div>
 
               <div className="w-full mt-6 grid grid-cols-2 gap-3">
-                <Link href="/profile/setup" className="w-full">
+                <Link href="/settings" className="w-full">
                   <Button variant="outline" className="w-full rounded-xl gap-2 font-medium">
                     <Settings className="w-4 h-4" /> ตั้งค่า
                   </Button>
@@ -128,6 +137,13 @@ export default async function ProfilePage() {
                   <Bookmark className="mr-2 h-4 w-4" />
                   บุ๊กมาร์ก
                 </TabsTrigger>
+                <TabsTrigger
+                  value="activity"
+                  className="flex-1 rounded-lg data-[state=active]:bg-(--color-yru-pink) data-[state=active]:text-white data-[state=active]:shadow h-10"
+                >
+                  <Activity className="mr-2 h-4 w-4" />
+                  กิจกรรม
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="posts" className="mt-0 outline-none">
@@ -145,6 +161,12 @@ export default async function ProfilePage() {
                   initialPosts={initialBookmarks} 
                 />
               </TabsContent>
+
+              <TabsContent value="activity" className="mt-0 outline-none">
+                <Suspense fallback={<div className="space-y-3"><PostSkeleton /><PostSkeleton /></div>}>
+                  <ActivityTab userId={user.id} />
+                </Suspense>
+              </TabsContent>
             </Tabs>
           </div>
           
@@ -152,6 +174,116 @@ export default async function ProfilePage() {
       </main>
 
       <MobileNav />
+    </div>
+  );
+}
+
+async function ActivityTab({ userId }: { userId: string }) {
+  const supabase = await createClient();
+
+  const { data: comments } = await supabase
+    .from('comments')
+    .select('*, post:posts(id, title)')
+    .eq('author_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const { data: reactions } = await supabase
+    .from('post_reactions')
+    .select('*, post:posts(id, title)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const activities = [
+    ...(comments?.map(c => ({
+      type: 'comment' as const,
+      id: c.id,
+      content: c.content,
+      post: c.post,
+      created_at: c.created_at,
+    })) || []),
+    ...(reactions?.map(r => ({
+      type: 'reaction' as const,
+      id: r.id,
+      reaction_type: r.reaction_type,
+      post: r.post,
+      created_at: r.created_at,
+    })) || []),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+   .slice(0, 30);
+
+  const reactionEmojis: Record<string, string> = {
+    LIKE: '👍',
+    LOVE: '❤️',
+    HAHA: '😂',
+    WOW: '😮',
+    SAD: '😢',
+    ANGRY: '😡',
+  };
+
+  return (
+    <div className="space-y-1">
+      {activities.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+          <Activity className="h-10 w-10 mb-3 opacity-30" />
+          <p className="text-sm">ยังไม่มีกิจกรรม</p>
+        </div>
+      ) : (
+        activities.map((activity) => (
+          <div
+            key={activity.id}
+            className="flex items-start gap-3 rounded-xl p-3 hover:bg-muted/40 transition-colors"
+          >
+            <div className="shrink-0 mt-0.5">
+              {activity.type === 'comment' ? (
+                <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                </div>
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <span className="text-sm">
+                    {reactionEmojis[(activity as any).reaction_type] || '👍'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm">
+                {activity.type === 'comment' ? (
+                  <>
+                    <span className="text-muted-foreground">แสดงความคิดเห็นใน</span>{' '}
+                    <Link
+                      href={`/post/${(activity.post as any)?.id}`}
+                      className="font-medium text-[var(--color-yru-pink)] hover:underline"
+                    >
+                      {(activity.post as any)?.title || 'โพสต์ที่ถูกลบ'}
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground">รีแอค</span>{' '}
+                    <Link
+                      href={`/post/${(activity.post as any)?.id}`}
+                      className="font-medium text-[var(--color-yru-pink)] hover:underline"
+                    >
+                      {(activity.post as any)?.title || 'โพสต์ที่ถูกลบ'}
+                    </Link>
+                  </>
+                )}
+              </p>
+              {activity.type === 'comment' && (
+                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                  {(activity as any).content}
+                </p>
+              )}
+              <span className="mt-1 block text-xs text-muted-foreground/60">
+                {timeAgo(activity.created_at)}
+              </span>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

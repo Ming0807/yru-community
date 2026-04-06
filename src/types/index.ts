@@ -6,6 +6,7 @@ export interface Profile {
   id: string;
   email: string;
   display_name: string;
+  bio?: string | null;
   faculty: string | null;
   major: string | null;
   avatar_url: string | null;
