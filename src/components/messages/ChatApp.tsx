@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Send, ArrowLeft, MoreVertical, MessageSquare } from 'lucide-react';
+import { Search, Send, ArrowLeft, MoreVertical, MessageSquare, Loader2 } from 'lucide-react';
 import { timeAgo } from '@/lib/utils';
 import type { Message, Profile } from '@/types';
 import { toast } from 'sonner';
@@ -37,6 +37,60 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
   const [loadingInitial, setLoadingInitial] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const typingChannelRef = useRef<any>(null);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Send typing indicator with debounce
+  const sendTypingIndicator = useCallback(() => {
+    if (!selectedUserId || !typingChannelRef.current) return;
+    
+    typingChannelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUser.id, isTyping: true },
+    });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    typingTimeoutRef.current = setTimeout(() => {
+      typingChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUser.id, isTyping: false },
+      });
+    }, 2000);
+  }, [selectedUserId, currentUser.id]);
+
+  // Set up typing channel
+  useEffect(() => {
+    if (!selectedUserId) {
+      if (typingChannelRef.current) {
+        supabase.removeChannel(typingChannelRef.current);
+        typingChannelRef.current = null;
+      }
+      setIsTyping(false);
+      return;
+    }
+    
+    const channelName = `typing:${[currentUser.id, selectedUserId].sort().join(':')}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('broadcast', { event: 'typing' }, (payload: { userId: string; isTyping: boolean }) => {
+        if (payload.userId === selectedUserId) {
+          setIsTyping(payload.isTyping);
+        }
+      })
+      .subscribe();
+
+    typingChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      typingChannelRef.current = null;
+    };
+  }, [selectedUserId, currentUser.id, supabase]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -374,15 +428,43 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
                   </div>
                 );
               })}
+              
+              {isTyping && (
+                <div className="flex gap-2 max-w-[85%]">
+                  <div className="shrink-0 w-8">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={selectedUser.avatar_url || ''} />
+                      <AvatarFallback className="text-[10px]">{selectedUser.display_name?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="bg-card border shadow-sm rounded-2xl rounded-tl-sm px-4 py-3">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
             <div className="p-3 bg-card border-t">
+              {isTyping && (
+                <div className="flex items-center gap-1.5 px-2 mb-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>{selectedUser.display_name} กำลังพิมพ์...</span>
+                </div>
+              )}
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <Input
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    if (e.target.value.trim()) sendTypingIndicator();
+                  }}
                   placeholder="พิมพ์ข้อความ..."
                   className="rounded-full bg-muted/50 border-none px-4"
                 />
