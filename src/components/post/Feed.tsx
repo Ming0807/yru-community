@@ -17,7 +17,14 @@ export default async function Feed({ sort, page }: FeedProps) {
   // Build query
   let query = supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)', { count: 'exact' });
+    .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)', { count: 'exact' });
+
+  // Filter out soft-deleted posts (only if column exists)
+  try {
+    query = query.is('deleted_at', null);
+  } catch {
+    // Column doesn't exist yet, skip filter
+  }
 
   // Sort
   query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
@@ -32,7 +39,13 @@ export default async function Feed({ sort, page }: FeedProps) {
 
   query = query.range(offset, offset + POSTS_PER_PAGE - 1);
 
-  const { data: posts, count } = await query;
+  const { data: posts, count, error } = await query;
+
+  if (error) {
+    console.error('[Feed] Query error:', error);
+  } else {
+    console.log(`[Feed] Loaded ${posts?.length || 0} posts, total: ${count}`);
+  }
 
   // Fetch active feed ads
   const { data: ads } = await supabase

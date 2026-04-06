@@ -71,7 +71,6 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
         typingChannelRef.current = null;
       }
       setIsTyping(false);
-      setIsUserOnline(false);
       return;
     }
     
@@ -84,20 +83,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
           setIsTyping(payload.isTyping);
         }
       })
-      .on('broadcast', { event: 'presence' }, (payload: { userId: string; status: string }) => {
-        if (payload.userId === selectedUserId) {
-          setIsUserOnline(payload.status === 'online');
-        }
-      })
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'presence',
-            payload: { userId: currentUser.id, status: 'online' },
-          });
-        }
-      });
+      .subscribe();
 
     typingChannelRef.current = channel;
 
@@ -107,6 +93,31 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
     };
   }, [selectedUserId, currentUser.id, supabase]);
 
+  // Set up global presence channel
+  useEffect(() => {
+    const presenceChannel = supabase.channel('global_presence');
+    
+    presenceChannel
+      .on('broadcast', { event: 'presence' }, (payload: { userId: string; status: string }) => {
+        if (selectedUserId && payload.userId === selectedUserId) {
+          setIsUserOnline(payload.status === 'online');
+        }
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          presenceChannel.send({
+            type: 'broadcast',
+            event: 'presence',
+            payload: { userId: currentUser.id, status: 'online' },
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentUser.id, selectedUserId, supabase]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -115,48 +126,67 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
   // Load all user's messages to build conversation list
   useEffect(() => {
     const fetchConversations = async () => {
-      // Get all messages where I'm sender or receiver
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:profiles!sender_id(*),
-          receiver:profiles!receiver_id(*)
-        `)
-        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
+      try {
+        // Get all messages where I'm sender or receiver
+        const { data, error } = await supabase
+          .from('messages')
+          .select(`
+            *,
+            sender:profiles!sender_id(*),
+            receiver:profiles!receiver_id(*)
+          `)
+          .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        return;
-      }
+        if (error) {
+          console.error('[Chat] Error fetching messages:', error);
+          toast.error('ไม่สามารถโหลดข้อความได้');
+          setLoadingInitial(false);
+          return;
+        }
 
-      // Group by the "other" user
-      const convosMap = new Map<string, Conversation>();
-      
-      for (const msg of (data as any[])) {
-        const isMeSender = msg.sender_id === currentUser.id;
-        const otherUser = isMeSender ? msg.receiver : msg.sender;
-        const otherUserId = otherUser.id;
+        if (!data || data.length === 0) {
+          console.log('[Chat] No messages found');
+          setConversations([]);
+          setLoadingInitial(false);
+          return;
+        }
 
-        if (!convosMap.has(otherUserId)) {
-          convosMap.set(otherUserId, {
-            userId: otherUserId,
-            profile: otherUser,
-            lastMessage: msg,
-            unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0
-          });
-        } else {
-          // Add to unread count if it's unread and from them
-          if (!isMeSender && !msg.is_read) {
-            const current = convosMap.get(otherUserId)!;
-            current.unreadCount = (current.unreadCount || 0) + 1;
+        console.log(`[Chat] Loaded ${data.length} messages`);
+
+        // Group by the "other" user
+        const convosMap = new Map<string, Conversation>();
+        
+        for (const msg of (data as any[])) {
+          const isMeSender = msg.sender_id === currentUser.id;
+          const otherUser = isMeSender ? msg.receiver : msg.sender;
+          const otherUserId = otherUser?.id;
+
+          if (!otherUserId) continue;
+
+          if (!convosMap.has(otherUserId)) {
+            convosMap.set(otherUserId, {
+              userId: otherUserId,
+              profile: otherUser,
+              lastMessage: msg,
+              unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0
+            });
+          } else {
+            // Add to unread count if it's unread and from them
+            if (!isMeSender && !msg.is_read) {
+              const current = convosMap.get(otherUserId)!;
+              current.unreadCount = (current.unreadCount || 0) + 1;
+            }
           }
         }
-      }
 
-      setConversations(Array.from(convosMap.values()));
-      setLoadingInitial(false);
+        console.log(`[Chat] ${convosMap.size} conversations`);
+        setConversations(Array.from(convosMap.values()));
+      } catch (err) {
+        console.error('[Chat] Unexpected error:', err);
+      } finally {
+        setLoadingInitial(false);
+      }
     };
 
     fetchConversations();
@@ -232,7 +262,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
           const newMsg = payload.new as Message;
           
           // If the message is from the currently selected user, add it to chat array
-          if (newMsg.sender_id === selectedUserId) {
+          if (selectedUserId && newMsg.sender_id === selectedUserId) {
             setMessages(prev => [...prev, newMsg]);
             
             // Auto mark as read
@@ -240,29 +270,21 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
               .from('messages')
               .update({ is_read: true })
               .eq('id', newMsg.id);
-          } else {
-            // Otherwise just update the conversation list to show unread
-            // First we need the sender profile if it's a new conversation
-            let senderProfile = conversations.find(c => c.userId === newMsg.sender_id)?.profile;
-            
-            if (!senderProfile) {
-              const { data } = await supabase.from('profiles').select('*').eq('id', newMsg.sender_id).single();
-              senderProfile = data;
-            }
-
-            if (senderProfile) {
-              setConversations(prev => {
-                const existing = prev.find(c => c.userId === newMsg.sender_id);
-                const updatedItem = {
-                  userId: newMsg.sender_id,
-                  profile: senderProfile!,
-                  lastMessage: newMsg,
-                  unreadCount: (existing?.unreadCount || 0) + 1
-                };
-                return [updatedItem, ...prev.filter(c => c.userId !== newMsg.sender_id)];
-              });
-            }
           }
+          
+          // Update the conversation list
+          setConversations(prev => {
+            const existing = prev.find(c => c.userId === newMsg.sender_id);
+            if (existing) {
+              const updatedItem = {
+                ...existing,
+                lastMessage: newMsg,
+                unreadCount: (newMsg.sender_id === selectedUserId) ? 0 : (existing.unreadCount || 0) + 1
+              };
+              return [updatedItem, ...prev.filter(c => c.userId !== newMsg.sender_id)];
+            }
+            return prev;
+          });
         }
       )
       .subscribe();
@@ -270,7 +292,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser.id, selectedUserId, conversations]);
+  }, [currentUser.id, selectedUserId]);
 
   // Handle sending a message
   const handleSendMessage = async (e: React.FormEvent) => {
