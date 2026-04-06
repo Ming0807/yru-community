@@ -40,6 +40,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const typingChannelRef = useRef<any>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [isUserOnline, setIsUserOnline] = useState(false);
 
   // Send typing indicator with debounce
   const sendTypingIndicator = useCallback(() => {
@@ -70,6 +71,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
         typingChannelRef.current = null;
       }
       setIsTyping(false);
+      setIsUserOnline(false);
       return;
     }
     
@@ -82,7 +84,20 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
           setIsTyping(payload.isTyping);
         }
       })
-      .subscribe();
+      .on('broadcast', { event: 'presence' }, (payload: { userId: string; status: string }) => {
+        if (payload.userId === selectedUserId) {
+          setIsUserOnline(payload.status === 'online');
+        }
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'presence',
+            payload: { userId: currentUser.id, status: 'online' },
+          });
+        }
+      });
 
     typingChannelRef.current = channel;
 
@@ -347,6 +362,7 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
                       {conv.profile.display_name?.[0]?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
+                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-card" />
                   {conv.unreadCount! > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border-2 border-card">
                       {conv.unreadCount}
@@ -390,6 +406,13 @@ export default function ChatApp({ currentUser }: ChatAppProps) {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-sm truncate">{selectedUser.display_name}</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  {isUserOnline ? (
+                    <span className="text-green-500 font-medium">ออนไลน์</span>
+                  ) : (
+                    'ออฟไลน์'
+                  )}
+                </p>
               </div>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <MoreVertical className="h-5 w-5 text-muted-foreground" />
