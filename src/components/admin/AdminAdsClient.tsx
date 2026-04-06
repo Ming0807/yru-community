@@ -43,6 +43,8 @@ export default function AdminAdsClient({ initialAds }: Props) {
     position: 'feed' as 'feed' | 'sidebar',
     revenue: 0,
     is_active: true,
+    start_date: '',
+    end_date: '',
     target_tags: [] as string[],
     target_categories: [] as number[],
   });
@@ -149,6 +151,8 @@ export default function AdminAdsClient({ initialAds }: Props) {
       position: 'feed',
       revenue: 0,
       is_active: true,
+      start_date: '',
+      end_date: '',
       target_tags: [],
       target_categories: [],
     });
@@ -163,6 +167,8 @@ export default function AdminAdsClient({ initialAds }: Props) {
       position: ad.position,
       revenue: ad.revenue,
       is_active: ad.is_active,
+      start_date: (ad as any).start_date ? new Date((ad as any).start_date).toISOString().split('T')[0] : '',
+      end_date: (ad as any).end_date ? new Date((ad as any).end_date).toISOString().split('T')[0] : '',
       target_tags: ad.target_tags || [],
       target_categories: ad.target_categories || [],
     });
@@ -330,6 +336,25 @@ export default function AdminAdsClient({ initialAds }: Props) {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">วันที่เริ่มต้น</label>
+                      <Input
+                        type="date"
+                        value={formData.start_date}
+                        onChange={e => setFormData({...formData, start_date: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">วันที่สิ้นสุด</label>
+                      <Input
+                        type="date"
+                        value={formData.end_date}
+                        onChange={e => setFormData({...formData, end_date: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">หมวดหมู่เป้าหมาย</label>
                     <div className="flex flex-wrap gap-2 p-3 border rounded-xl bg-muted/10">
@@ -442,6 +467,12 @@ export default function AdminAdsClient({ initialAds }: Props) {
                         <a href={ad.target_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
                           <ExternalLink className="w-3 h-3" /> ลิงก์ปลายทาง
                         </a>
+                        {(ad as any).start_date && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date((ad as any).start_date).toLocaleDateString('th-TH')}
+                            {(ad as any).end_date ? ` - ${new Date((ad as any).end_date).toLocaleDateString('th-TH')}` : ''}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-4">

@@ -20,7 +20,8 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { TrendingUp, Eye, MousePointerClick, Users, ImageIcon } from 'lucide-react';
+import { TrendingUp, Eye, MousePointerClick, Users, ImageIcon, Calendar } from 'lucide-react';
+import Link from 'next/link';
 
 const COLORS = ['#E88B9C', '#7EC8A4', '#FFB74D', '#A569BD', '#5DADE2'];
 
@@ -33,20 +34,41 @@ interface Props {
   activityData: any[];
   categoryData: any[];
   adPerformanceData: any[];
+  days?: number;
 }
 
 export default function AdminAnalyticsClient({
   stats,
   activityData,
   categoryData,
-  adPerformanceData
+  adPerformanceData,
+  days = 7,
 }: Props) {
+  const dayOptions = [7, 30, 90];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
-      <div className="mb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">สถิติพฤติกรรมผู้ใช้ & วิเคราะห์ข้อมูลระบบ</h1>
-        <p className="text-muted-foreground mt-1 text-sm">ตรวจสอบภาพรวมการใช้งาน ยอดเข้าชม และประสิทธิภาพโฆษณาใน 7 วันที่ผ่านมา</p>
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">สถิติพฤติกรรมผู้ใช้ & วิเคราะห์ข้อมูลระบบ</h1>
+          <p className="text-muted-foreground mt-1 text-sm">ตรวจสอบภาพรวมการใช้งาน ยอดเข้าชม และประสิทธิภาพโฆษณา</p>
+        </div>
+        <div className="flex items-center gap-1.5 bg-card border rounded-xl p-1">
+          <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
+          {dayOptions.map(d => (
+            <Link
+              key={d}
+              href={`/admin/analytics?days=${d}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                d === days
+                  ? 'bg-[var(--color-yru-pink)] text-white'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              {d} วัน
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Top Stats */}
@@ -99,7 +121,7 @@ export default function AdminAnalyticsClient({
         {/* Main Chart: User Activity */}
         <Card className="card-shadow border-border/40 lg:col-span-4">
           <CardHeader>
-            <CardTitle>แนวโน้มการโต้ตอบ (7 วันล่าสุด)</CardTitle>
+            <CardTitle>แนวโน้มการโต้ตอบ ({days} วันล่าสุด)</CardTitle>
             <CardDescription>
               เปรียบเทียบจำนวนการตั้งกระทู้ใหม่และการคอมเมนต์ในแต่ละวัน
             </CardDescription>

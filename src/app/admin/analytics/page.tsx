@@ -3,7 +3,9 @@ import AdminAnalyticsClient from '@/components/admin/AdminAnalyticsClient';
 
 export const metadata = { title: 'สถิติพฤติกรรมผู้ใช้ - Admin | YRU Community' };
 
-export default async function AdminAnalyticsPage() {
+export default async function AdminAnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+  const { days: daysParam } = await searchParams;
+  const days = parseInt(daysParam || '7');
   const supabase = await createClient();
 
   // 1. Fetch High Level Stats
@@ -31,24 +33,24 @@ export default async function AdminAnalyticsPage() {
     totalAdsCTR: Number(avgCtr),
   };
 
-  // 2. 7-day Activity Data
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // 2. Activity Data for selected date range
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
 
   const { data: recentPosts } = await supabase
     .from('posts')
     .select('created_at')
-    .gte('created_at', sevenDaysAgo.toISOString());
+    .gte('created_at', startDate.toISOString());
 
   const { data: recentComments } = await supabase
     .from('comments')
     .select('created_at')
-    .gte('created_at', sevenDaysAgo.toISOString());
+    .gte('created_at', startDate.toISOString());
 
   const daysTemp: Record<string, { posts: number; comments: number }> = {};
   
-  // Initialize last 7 days
-  for (let i = 6; i >= 0; i--) {
+  // Initialize days
+  for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dayStr = d.toLocaleDateString('th-TH', { weekday: 'short' });
@@ -120,6 +122,7 @@ export default async function AdminAnalyticsPage() {
       activityData={activityData}
       categoryData={categoryData}
       adPerformanceData={adPerformanceData}
+      days={days}
     />
   );
 }
