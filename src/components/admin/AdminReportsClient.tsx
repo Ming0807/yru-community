@@ -2,13 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, ExternalLink, MessageSquare, FileText, CheckCircle, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { timeAgo } from '@/lib/utils';
-import { logAdminAction } from '@/lib/admin-audit';
 
 interface ReportItem {
   id: string;
@@ -29,25 +27,23 @@ interface Props {
 
 export default function AdminReportsClient({ initialReports }: Props) {
   const [reports, setReports] = useState<ReportItem[]>(initialReports);
-  const supabase = createClient();
 
   const resolveReport = async (reportId: string) => {
     try {
-      const { error } = await supabase
-        .from('reports')
-        .update({ status: 'resolved' })
-        .eq('id', reportId);
+      const res = await fetch('/api/admin/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, action: 'resolve' }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
 
       setReports((prev) =>
         prev.map((r) => (r.id === reportId ? { ...r, status: 'resolved' as const } : r))
       );
-
-      await logAdminAction('RESOLVE_REPORT', {
-        target_type: 'report',
-        target_id: reportId,
-      });
 
       toast.success('ทำเครื่องหมายว่าจัดการแล้ว');
     } catch {
@@ -59,38 +55,16 @@ export default function AdminReportsClient({ initialReports }: Props) {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบเนื้อหานี้และปิดรายงาน?')) return;
 
     try {
-      if (report.post_id) {
-        const { error } = await supabase
-          .from('posts')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', report.post_id);
-        if (error) throw error;
-
-        await logAdminAction('DELETE_POST', {
-          target_type: 'post',
-          target_id: report.post_id,
-          extra: { reason: 'reported_content', report_id: report.id },
-        });
-      } else if (report.comment_id) {
-        const { error } = await supabase.from('comments').delete().eq('id', report.comment_id);
-        if (error) throw error;
-
-        await logAdminAction('DELETE_COMMENT', {
-          target_type: 'comment',
-          target_id: report.comment_id,
-          extra: { reason: 'reported_content', report_id: report.id },
-        });
-      }
-
-      await supabase
-        .from('reports')
-        .update({ status: 'resolved' })
-        .eq('id', report.id);
-
-      await logAdminAction('DELETE_REPORT_CONTENT', {
-        target_type: 'report',
-        target_id: report.id,
+      const res = await fetch('/api/admin/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId: report.id, action: 'delete_content' }),
       });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
 
       setReports((prev) => prev.filter((r) => r.id !== report.id));
       toast.success('ลบเนื้อหาและจัดการรายงานสำเร็จ');

@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
-import { logAdminAction } from '@/lib/admin-audit';
 
 interface Props {
   initialUsers: Profile[];
@@ -44,27 +43,22 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
     setLoadingMore(false);
   };
 
-  const updateUser = async (userId: string, updates: Partial<Profile>, actionLabel?: string) => {
+  const updateUser = async (userId: string, updates: Partial<Profile>) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId);
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, updates }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
 
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, ...updates } : u))
       );
-
-      if (actionLabel) {
-        const user = users.find(u => u.id === userId);
-        await logAdminAction(actionLabel as any, {
-          target_type: 'user',
-          target_id: userId,
-          extra: { user_name: user?.display_name, updates },
-        });
-      }
 
       toast.success('อัปเดตข้อมูลผู้ใช้สำเร็จ');
     } catch {
@@ -74,25 +68,25 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
 
   const handlePromoteToAdmin = async (userId: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ที่จะตั้งผู้ใช้รายนี้เป็นแอดมิน?\n\nการกระทำนี้จะให้สิทธิ์เต็มในการจัดการระบบ')) return;
-    await updateUser(userId, { role: 'admin' }, 'PROMOTE_ADMIN');
+    await updateUser(userId, { role: 'admin' });
   };
 
   const handleDemoteFromAdmin = async (userId: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ที่จะปลดแอดมินรายนี้?')) return;
-    await updateUser(userId, { role: 'user' }, 'DEMOTE_ADMIN');
+    await updateUser(userId, { role: 'user' });
   };
 
   const handleBanUser = async (userId: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ที่จะแบนผู้ใช้รายนี้ถาวร?')) return;
-    await updateUser(userId, { status: 'banned' }, 'BAN_USER');
+    await updateUser(userId, { status: 'banned' });
   };
 
   const handleSuspendUser = async (userId: string) => {
-    await updateUser(userId, { status: 'suspended' }, 'SUSPEND_USER');
+    await updateUser(userId, { status: 'suspended' });
   };
 
   const handleActivateUser = async (userId: string) => {
-    await updateUser(userId, { status: 'active' }, 'ACTIVATE_USER');
+    await updateUser(userId, { status: 'active' });
   };
 
   const filteredUsers = users.filter(

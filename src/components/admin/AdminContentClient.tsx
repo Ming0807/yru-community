@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Search, Trash2, ExternalLink, ChevronDown, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { timeAgo } from '@/lib/utils';
-import { logAdminAction } from '@/lib/admin-audit';
 
 interface ContentPost {
   id: string;
@@ -51,17 +50,14 @@ export default function AdminContentClient({ initialPosts, totalCount }: Props) 
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบกระทู้นี้ถาวร?')) return;
 
     try {
-      const { error } = await supabase
-        .from('posts')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', postId);
-
-      if (error) throw error;
-
-      await logAdminAction('DELETE_POST', {
-        target_type: 'post',
-        target_id: postId,
+      const res = await fetch(`/api/admin/posts?id=${postId}`, {
+        method: 'DELETE',
       });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
 
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       toast.success('ลบกระทู้สำเร็จ');
