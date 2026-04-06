@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react'; // 1. นำเข้า useEffect
+import { useState, useEffect, Suspense } from 'react'; // 1. นำเข้า useEffect
 import {
   Search,
   Menu,
@@ -74,7 +74,9 @@ export default function Header() {
 
         {/* Search - Desktop */}
         <div className="hidden flex-1 max-w-md mx-8 md:block">
-          <SearchBar />
+          <Suspense fallback={<div className="h-10 w-full rounded-full bg-muted/50" />}>
+            <SearchBar />
+          </Suspense>
         </div>
 
         {/* Actions */}
