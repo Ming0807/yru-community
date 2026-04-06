@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users, Eye } from 'lucide-react';
+import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users, Eye, Download, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 
@@ -90,6 +90,29 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
     await updateUser(userId, { status: 'active' });
   };
 
+  const exportCSV = () => {
+    const headers = ['ID', 'ชื่อ', 'อีเมล', 'คณะ', 'สาขา', 'สถานะ', 'บทบาท', 'วันที่เข้าร่วม'];
+    const rows = filteredUsers.map(u => [
+      u.id,
+      u.display_name,
+      u.email,
+      u.faculty || '',
+      u.major || '',
+      u.status || 'active',
+      u.role || 'user',
+      new Date(u.created_at).toLocaleDateString('th-TH'),
+    ]);
+
+    const csvContent = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredUsers = users.filter(
     (u) =>
       u.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,14 +131,24 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
             รายชื่อผู้ใช้ทั้งหมด {totalCount.toLocaleString()} คนในระบบ YRU Community
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="ค้นหาชื่อ หรือ อีเมล..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 rounded-xl"
-          />
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            className="rounded-xl gap-2 shrink-0"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="ค้นหาชื่อ หรือ อีเมล..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 rounded-xl"
+            />
+          </div>
         </div>
       </div>
 
