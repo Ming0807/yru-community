@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users, Eye, Download, Check } from 'lucide-react';
+import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users, Eye, Download, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 
@@ -26,6 +26,7 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
   const [users, setUsers] = useState<Profile[]>(initialUsers);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const supabase = createClient();
 
   const loadMore = async () => {
@@ -90,6 +91,51 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
     await updateUser(userId, { status: 'active' });
   };
 
+  const toggleSelect = (userId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === filteredUsers.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredUsers.map(u => u.id)));
+    }
+  };
+
+  const bulkUpdate = async (updates: Partial<Profile>) => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`คุณแน่ใจหรือไม่ที่จะดำเนินการกับ ${selectedIds.size} ผู้ใช้ที่เลือก?`)) return;
+
+    let success = 0;
+    let failed = 0;
+
+    for (const userId of selectedIds) {
+      try {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, updates }),
+        });
+        if (res.ok) success++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    setUsers(prev =>
+      prev.map(u => selectedIds.has(u.id) ? { ...u, ...updates } : u)
+    );
+    setSelectedIds(new Set());
+    toast.success(`สำเร็จ ${success} รายการ${failed > 0 ? `, ไม่สำเร็จ ${failed}` : ''}`);
+  };
+
   const exportCSV = () => {
     const headers = ['ID', 'ชื่อ', 'อีเมล', 'คณะ', 'สาขา', 'สถานะ', 'บทบาท', 'วันที่เข้าร่วม'];
     const rows = filteredUsers.map(u => [
@@ -121,7 +167,7 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Users className="h-6 w-6 text-(--color-yru-pink)" />
@@ -132,6 +178,25 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2 text-sm">
+              <span className="font-medium text-[var(--color-yru-pink)]">{selectedIds.size} เลือก</span>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedIds(new Set())}>
+                <X className="h-3 w-3" />
+              </Button>
+              <div className="flex gap-1 ml-2">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => bulkUpdate({ status: 'active' })}>
+                  ปลดแบน
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => bulkUpdate({ status: 'suspended' })}>
+                  แบนชั่วคราว
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => bulkUpdate({ status: 'banned' })}>
+                  แบนถาวร
+                </Button>
+              </div>
+            </div>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -157,6 +222,14 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground bg-muted/50 uppercase border-b border-border/60">
               <tr>
+                <th className="px-6 py-4 font-medium w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === filteredUsers.length && filteredUsers.length > 0}
+                    onChange={selectAll}
+                    className="w-4 h-4 rounded cursor-pointer"
+                  />
+                </th>
                 <th className="px-6 py-4 font-medium">ผู้ใช้งาน</th>
                 <th className="px-6 py-4 font-medium">คณะ / สาขา</th>
                 <th className="px-6 py-4 font-medium">สถานะ</th>
@@ -173,7 +246,15 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                  <tr key={user.id} className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${selectedIds.has(user.id) ? 'bg-[var(--color-yru-pink)]/5' : ''}`}>
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(user.id)}
+                        onChange={() => toggleSelect(user.id)}
+                        className="w-4 h-4 rounded cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">

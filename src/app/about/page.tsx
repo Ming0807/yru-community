@@ -1,3 +1,6 @@
+// เพิ่มการ Import Suspense จาก React
+import { Suspense } from 'react'; 
+
 import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
 import { Button } from '@/components/ui/button';
@@ -10,6 +13,7 @@ export const metadata = {
   description: 'ชุมชนออนไลน์สำหรับนักศึกษามหาวิทยาลัยราชภัฏยะลา',
 };
 
+// ... (ส่วน FEATURES และ RULES คงเดิม)
 const FEATURES = [
   {
     icon: BookOpen,
@@ -54,7 +58,10 @@ const RULES = [
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      {/* ครอบ Header ด้วย Suspense */}
+      <Suspense fallback={<div className="h-16" />}>
+        <Header />
+      </Suspense>
 
       <main className="mx-auto max-w-3xl px-4 py-8 pb-24">
         {/* Hero */}
@@ -163,7 +170,10 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <MobileNav />
+      {/* ครอบ MobileNav ด้วย Suspense */}
+      <Suspense fallback={null}>
+        <MobileNav />
+      </Suspense>
     </div>
   );
 }
