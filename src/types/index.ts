@@ -101,14 +101,15 @@ export interface Notification {
   id: string;
   user_id: string;
   actor_id: string;
-  type: 'COMMENT' | 'REPLY';
-  post_id: string;
-  comment_id: string;
+  type: 'COMMENT' | 'REPLY' | 'FOLLOW' | 'REACTION' | 'MENTION' | 'SYSTEM';
+  post_id: string | null;
+  comment_id: string | null;
   is_read: boolean;
   created_at: string;
+  metadata?: Record<string, any>;
   // Joined
   actor?: Profile;
-  post?: { title: string };
+  post?: { id: string; title: string };
   comment?: { content: string };
 }
 

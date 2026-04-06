@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Bell, Check, Loader2, MessageSquare, Reply } from 'lucide-react';
+import { Bell, Check, Loader2, MessageSquare, Reply, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -196,6 +196,14 @@ export default function NotificationDropdown({ userId }: { userId: string }) {
             </div>
           )}
         </div>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="justify-center cursor-pointer">
+          <Link href="/notifications" className="text-sm text-[var(--color-yru-pink)] font-medium py-2">
+            <ExternalLink className="mr-1.5 h-3.5 w-3.5 inline" />
+            ดูการแจ้งเตือนทั้งหมด
+          </Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

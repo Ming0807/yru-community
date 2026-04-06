@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, PenSquare, User, Shield } from 'lucide-react';
+import { Home, Search, PenSquare, User, Shield, Bell } from 'lucide-react';
 import { useUser } from '@/components/UserProvider';
 
 const NAV_ITEMS = [
   { href: '/', label: 'หน้าหลัก', icon: Home },
   { href: '/search', label: 'ค้นหา', icon: Search },
+  { href: '/notifications', label: 'แจ้งเตือน', icon: Bell },
   { href: '/post/create', label: 'ตั้งกระทู้', icon: PenSquare },
   { href: '/profile', label: 'โปรไฟล์', icon: User },
 ];
