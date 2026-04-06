@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users } from 'lucide-react';
+import { MoreHorizontal, Search, Shield, Ban, CheckCircle, ChevronDown, Users, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 
@@ -149,7 +150,9 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-foreground">{user.display_name}</p>
+                          <Link href={`/admin/users/${user.id}`} className="font-medium text-foreground hover:text-[var(--color-yru-pink)] hover:underline transition-colors">
+                            {user.display_name}
+                          </Link>
                           <p className="text-xs text-muted-foreground">{user.email}</p>
                         </div>
                       </div>
