@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import PostCard from '@/components/post/PostCard';
 import FeedAdCard from '@/components/ads/FeedAdCard';
 import { createClient } from '@/lib/supabase/client';
 import { POSTS_PER_PAGE } from '@/lib/constants';
 import type { Post, SortOption, Ad } from '@/types';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, ArrowUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useUser } from '@/components/UserProvider';
 
 interface InfiniteFeedProps {
   initialPosts: Post[];
@@ -21,6 +22,46 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [newPosts, setNewPosts] = useState<Post[]>([]);
+  const { user } = useUser();
+  const supabase = createClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('feed_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
+        },
+        (payload: { new: any }) => {
+          const newPost = payload.new as any;
+          if (sort === 'latest') {
+            setNewPosts((prev) => {
+              const exists = prev.some((p) => p.id === newPost.id);
+              if (exists) return prev;
+              return [newPost, ...prev];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sort, supabase]);
+
+  const loadNewPosts = () => {
+    setPosts((prev) => {
+      const existingIds = new Set(prev.map((p) => p.id));
+      const unique = newPosts.filter((p) => !existingIds.has(p.id));
+      return [...unique, ...prev];
+    });
+    setNewPosts([]);
+  };
 
   const hasMore = posts.length < totalCount;
 
@@ -90,6 +131,21 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
 
   return (
     <div className="space-y-4">
+      {newPosts.length > 0 && (
+        <div className="sticky top-20 z-10 flex items-center justify-center gap-2 rounded-xl border border-[var(--color-yru-pink)]/30 bg-[var(--color-yru-pink)]/10 backdrop-blur-md px-4 py-2.5 shadow-sm animate-fade-in-up">
+          <Sparkles className="h-4 w-4 text-[var(--color-yru-pink)]" />
+          <span className="text-sm font-medium">มี {newPosts.length} กระทู้ใหม่</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1 text-[var(--color-yru-pink)] hover:bg-[var(--color-yru-pink)]/20"
+            onClick={loadNewPosts}
+          >
+            <ArrowUp className="h-3 w-3" /> แสดง
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3">
         {posts.map((post, index) => {
           // Ad Selection Logic: Favor ads that target the current post's category or tags
