@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 1. นำเข้า useEffect
 import {
   Search,
   Menu,
@@ -24,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-// 1. เพิ่ม SheetTitle ในการ Import
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { createClient } from '@/lib/supabase/client';
 import { APP_NAME, CATEGORIES } from '@/lib/constants';
@@ -32,7 +31,6 @@ import type { Profile } from '@/types';
 import SearchBar from '@/components/search/SearchBar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import NotificationDropdown from '@/components/layout/NotificationDropdown';
-
 import { useUser } from '@/components/UserProvider';
 
 export default function Header() {
@@ -40,6 +38,13 @@ export default function Header() {
   const { user, loading } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const supabase = createClient();
+
+  // 2. สร้าง State สำหรับเช็กการ Mount
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -72,7 +77,6 @@ export default function Header() {
           <SearchBar />
         </div>
 
-    
         {/* Actions */}
         <div className="flex items-center gap-2">
           {/* Theme Toggle */}
@@ -110,55 +114,56 @@ export default function Header() {
               </Link>
               <NotificationDropdown userId={user.id} />
               <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="relative h-9 w-9 rounded-full"
-                >
-                  <Avatar className="h-9 w-9 ring-2 ring-border">
-                    <AvatarImage
-                      src={user.avatar_url ?? undefined}
-                      alt={user.display_name}
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)] text-sm font-semibold">
-                      {user.display_name?.charAt(0) ?? 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-3 py-2">
-                  <p className="font-medium text-sm">{user.display_name}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    โปรไฟล์
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {user.role === 'admin' && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" className="cursor-pointer text-(--color-yru-pink)">
-                        <Shield className="mr-2 h-4 w-4" />
-                        Admin Dashboard
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="text-destructive cursor-pointer"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  ออกจากระบบ
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="relative h-9 w-9 rounded-full"
+                  >
+                    <Avatar className="h-9 w-9 ring-2 ring-border">
+                      <AvatarImage
+                        src={user.avatar_url ?? undefined}
+                        alt={user.display_name}
+                      />
+                      <AvatarFallback className="bg-gradient-to-br from-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)] text-sm font-semibold">
+                        {user.display_name?.charAt(0) ?? 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-2">
+                    <p className="font-medium text-sm">{user.display_name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      โปรไฟล์
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {/* 3. เอา isMounted มาดักไว้ตรงเงื่อนไข Admin */}
+                  {isMounted && user.role === 'admin' && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="cursor-pointer text-(--color-yru-pink)">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-destructive cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    ออกจากระบบ
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ) : (
             <Link href="/login">
@@ -181,8 +186,6 @@ export default function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72 pt-12">
-              
-              {/* 2. เพิ่ม SheetTitle และใช้คลาส sr-only เพื่อซ่อนจากการมองเห็น */}
               <SheetTitle className="sr-only">เมนูนำทาง</SheetTitle>
               
               <nav className="flex flex-col gap-1">
@@ -191,8 +194,9 @@ export default function Header() {
                     key={cat.slug}
                     href={`/category/${cat.slug}`}
                     onClick={() => setMobileMenuOpen(false)}
+                    // 4. เอา isMounted มาดักไว้ตรงเงื่อนไข pathname ของ Categories
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${
-                      pathname === `/category/${cat.slug}`
+                      isMounted && pathname === `/category/${cat.slug}`
                         ? 'bg-muted font-medium'
                         : ''
                     }`}

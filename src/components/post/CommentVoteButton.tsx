@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // <-- 1. อย่าลืม import useEffect
 import { ArrowBigUp, ArrowBigDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ interface CommentVoteButtonProps {
   initialVoteCount?: number;
   initialUserVote?: 1 | -1 | 0;
   userId?: string;
+  onVoteChange?: (commentId: string, newVote: 1 | -1 | 0) => void;
 }
 
 export default function CommentVoteButton({
@@ -17,11 +18,24 @@ export default function CommentVoteButton({
   initialVoteCount = 0,
   initialUserVote = 0,
   userId,
+  onVoteChange,
 }: CommentVoteButtonProps) {
   const [voteCount, setVoteCount] = useState(initialVoteCount);
   const [userVote, setUserVote] = useState<1 | -1 | 0>(initialUserVote);
   const [isVoting, setIsVoting] = useState(false);
   const supabase = createClient();
+
+  // ------------------------------------------------------------------
+  // 🚀 2. จุดที่แก้ปัญหา "สีหายตอนรีเฟรช" (อัปเดต State เมื่อโหลดข้อมูลเสร็จ)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    setUserVote(initialUserVote);
+  }, [initialUserVote]);
+
+  useEffect(() => {
+    setVoteCount(initialVoteCount);
+  }, [initialVoteCount]);
+  // ------------------------------------------------------------------
 
   const handleVote = async (type: 1 | -1) => {
     if (!userId) {
@@ -32,17 +46,20 @@ export default function CommentVoteButton({
     if (isVoting) return;
     setIsVoting(true);
 
+    const prevVote = userVote;
+    const prevCount = voteCount;
+
     try {
-      const isRemoving = userVote === type;
-      const newVoteType = isRemoving ? 0 : type;
+      // โลจิกคำนวณแบบ Optimistic Update (เปลี่ยนสีก่อน รอ DB ทีหลัง - แบบ Facebook)
+      const newVoteType = userVote === type ? 0 : type;
       const voteDiff = newVoteType - userVote;
-      
-      // Optimistic update
+
       setUserVote(newVoteType);
       setVoteCount(prev => prev + voteDiff);
+      onVoteChange?.(commentId, newVoteType);
 
-      if (isRemoving) {
-        // Delete vote
+      // ยิงข้อมูลเข้า Database เบื้องหลัง
+      if (newVoteType === 0) {
         const { error } = await supabase
           .from('comment_votes')
           .delete()
@@ -50,25 +67,22 @@ export default function CommentVoteButton({
           .eq('user_id', userId);
         if (error) throw error;
       } else {
-        // Upsert vote
         const { error } = await supabase
           .from('comment_votes')
-          .upsert({
-            comment_id: commentId,
-            user_id: userId,
-            vote_type: type
-          }, {
-            onConflict: 'comment_id,user_id'
-          });
+          .upsert(
+            { comment_id: commentId, user_id: userId, vote_type: newVoteType },
+            { onConflict: 'comment_id,user_id' }
+          );
         if (error) throw error;
       }
-      
+
     } catch (error) {
       console.error(error);
       toast.error('ไม่สามารถโหวตได้ กรุณาลองใหม่');
-      // Revert optimistic update
-      setUserVote(userVote);
-      setVoteCount(initialVoteCount);
+      // ถ้า Error ให้ดึงสีและตัวเลขกลับมาเป็นแบบเดิม (Rollback)
+      setUserVote(prevVote);
+      setVoteCount(prevCount);
+      onVoteChange?.(commentId, prevVote);
     } finally {
       setIsVoting(false);
     }
@@ -81,7 +95,7 @@ export default function CommentVoteButton({
         disabled={isVoting}
         className={`p-1 rounded-full transition-colors ${
           userVote === 1
-            ? 'text-(--color-yru-pink) bg-(--color-yru-pink)/10'
+            ? 'text-[var(--color-yru-pink)] bg-[var(--color-yru-pink)]/10' // อัปเดตการเขียนสี CSS Variable ให้ชัวร์
             : 'text-muted-foreground hover:bg-muted/80'
         }`}
         title="เห็นด้วย"
@@ -90,7 +104,7 @@ export default function CommentVoteButton({
       </button>
 
       <span className={`text-xs font-semibold min-w-[1ch] text-center ${
-        userVote === 1 ? 'text-(--color-yru-pink)' : userVote === -1 ? 'text-blue-500' : 'text-foreground/80'
+        userVote === 1 ? 'text-[var(--color-yru-pink)]' : userVote === -1 ? 'text-blue-500' : 'text-foreground/80'
       }`}>
         {voteCount}
       </span>

@@ -65,6 +65,8 @@ export interface Comment {
   is_anonymous: boolean;
   vote_count?: number;
   created_at: string;
+  updated_at?: string;
+  is_edited?: boolean;
   // Joined
   author?: Profile;
   // Client-side grouped

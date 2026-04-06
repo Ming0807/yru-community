@@ -197,3 +197,6 @@ CREATE TRIGGER trg_comment_insert AFTER INSERT ON comments
   FOR EACH ROW EXECUTE FUNCTION increment_comment_count();
 CREATE TRIGGER trg_comment_delete AFTER DELETE ON comments
   FOR EACH ROW EXECUTE FUNCTION decrement_comment_count();
+
+-- ==========================================
+

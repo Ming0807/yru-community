@@ -5,6 +5,7 @@ import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
 import PostCard from '@/components/post/PostCard';
 import PostSkeleton from '@/components/post/PostSkeleton';
+import ProfileFeedClient from '@/components/profile/ProfileFeedClient';
 import SubscribeButton from '@/components/profile/SubscribeButton';
 import UserBadge, { ExpProgress } from '@/components/UserBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -105,12 +106,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        {/* Content Tabs */}
         <Tabs defaultValue="posts" className="w-full">
           <TabsList className="mb-6 w-full justify-start rounded-b-none border-b bg-transparent p-0">
             <TabsTrigger
               value="posts"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-(--color-yru-pink) data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-(--color-yru-pink) data-[state=active]:text-(--color-yru-pink) data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6"
             >
               <BookOpen className="mr-2 h-4 w-4" />
               โพสต์ทั้งหมด
@@ -137,23 +137,14 @@ async function UserPosts({ userId }: { userId: string }) {
     .select('*, author:profiles(*), category:categories(*)')
     .eq('author_id', userId)
     .eq('is_anonymous', false)
-    .order('created_at', { ascending: false });
-
-  if (!posts || posts.length === 0) {
-    return (
-      <div className="py-20 text-center border rounded-xl border-dashed">
-        <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-        <h3 className="text-lg font-medium text-foreground">ยังไม่มีโพสต์</h3>
-        <p className="text-sm text-muted-foreground mt-1">ผู้ใช้นี้ยังไม่ได้ตั้งกระทู้ใดๆ</p>
-      </div>
-    );
-  }
+    .order('created_at', { ascending: false })
+    .range(0, 9); // PRE-FETCH 10 items for first chunk
 
   return (
-    <div className="space-y-3">
-      {(posts as Post[]).map((post, idx) => (
-        <PostCard key={post.id} post={post} index={idx} />
-      ))}
-    </div>
+    <ProfileFeedClient 
+      userId={userId}
+      feedType="user_posts"
+      initialPosts={(posts as unknown as Post[]) ?? []}
+    />
   );
 }
