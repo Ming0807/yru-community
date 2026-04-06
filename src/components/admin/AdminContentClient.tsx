@@ -53,7 +53,7 @@ export default function AdminContentClient({ initialPosts, totalCount }: Props) 
     try {
       const { error } = await supabase
         .from('posts')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', postId);
 
       if (error) throw error;

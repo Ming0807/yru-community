@@ -60,7 +60,10 @@ export default function AdminReportsClient({ initialReports }: Props) {
 
     try {
       if (report.post_id) {
-        const { error } = await supabase.from('posts').delete().eq('id', report.post_id);
+        const { error } = await supabase
+          .from('posts')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', report.post_id);
         if (error) throw error;
 
         await logAdminAction('DELETE_POST', {

@@ -71,23 +71,25 @@ export default async function AdminAnalyticsPage() {
     กระทู้ใหม่: daysTemp[day].posts,
   }));
 
-  // 3. Category Distribution
+  // 3. Category Distribution — fetch real category names from DB
   const { data: postsCat } = await supabase.from('posts').select('category_id');
   const catCount: Record<number, number> = {};
   postsCat?.forEach((p: { category_id: number }) => {
     catCount[p.category_id] = (catCount[p.category_id] || 0) + 1;
   });
   
-  const mockCatNames: Record<number, string> = {
-    1: 'เรื่องทั่วไป',
-    2: 'การเรียน',
-    3: 'รีวิววิชา',
-    4: 'ถาม-ตอบ',
-    5: 'ซื้อขาย'
-  };
+  // Fetch real category names instead of hardcoding
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name');
+  
+  const catNameMap: Record<number, string> = {};
+  categories?.forEach((c: { id: number; name: string }) => {
+    catNameMap[c.id] = c.name;
+  });
   
   const categoryData = Object.keys(catCount).map(id => ({
-    name: mockCatNames[Number(id)] || `หมวด ${id}`,
+    name: catNameMap[Number(id)] || `หมวด ${id}`,
     value: catCount[Number(id)]
   }));
 
