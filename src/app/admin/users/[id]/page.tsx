@@ -31,7 +31,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     .select('id, title, created_at, vote_count, comment_count, category:categories(name)')
     .eq('author_id', id)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(20)
+    .returns<Array<{ id: string; title: string; created_at: string; vote_count: number; comment_count: number; category: { name: string }[] | null }>>();
 
   // Fetch user's comments
   const { data: comments } = await supabase
@@ -39,7 +40,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     .select('id, content, created_at, vote_count, post:posts(id, title)')
     .eq('author_id', id)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(20)
+    .returns<Array<{ id: string; content: string; created_at: string; vote_count: number; post: { id: string; title: string }[] | null }>>();
 
   // Fetch reports involving this user
   const { data: reports } = await supabase
@@ -47,7 +49,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     .select('id, reason, status, created_at, post:posts(id, title)')
     .eq('reporter_id', id)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(10)
+    .returns<Array<{ id: string; reason: string; status: string; created_at: string; post: { id: string; title: string }[] | null }>>();
 
   // Fetch follow stats
   const { count: followersCount } = await supabase
@@ -175,7 +178,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                   {post.title}
                 </Link>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span>{post.category?.name || 'ไม่ระบุ'}</span>
+                  <span>{(post.category as any)?.name || 'ไม่ระบุ'}</span>
                   <span>·</span>
                   <span>โหวต: {post.vote_count}</span>
                   <span>·</span>
@@ -203,9 +206,9 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               <div key={comment.id} className="p-4 hover:bg-muted/30 transition-colors">
                 <p className="text-sm line-clamp-2">{comment.content}</p>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  {comment.post && (
-                    <Link href={`/post/${comment.post.id}`} className="hover:text-[var(--color-yru-pink)] transition-colors">
-                      ใน: {comment.post.title}
+                  {(comment as any).post?.id && (
+                    <Link href={`/post/${(comment as any).post.id}`} className="hover:text-[var(--color-yru-pink)] transition-colors">
+                      ใน: {(comment as any).post.title}
                     </Link>
                   )}
                   <span>·</span>
@@ -234,11 +237,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 <div key={report.id} className="p-4 hover:bg-muted/30 transition-colors">
                   <p className="text-sm text-red-600">{report.reason}</p>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    {report.post && (
-                      <Link href={`/post/${report.post.id}`} className="hover:text-[var(--color-yru-pink)] transition-colors">
-                        กระทู้: {report.post.title}
-                      </Link>
-                    )}
+                  {(report as any).post?.[0]?.id && (
+                    <Link href={`/post/${(report as any).post[0].id}`} className="hover:text-[var(--color-yru-pink)] transition-colors">
+                      กระทู้: {(report as any).post[0].title}
+                    </Link>
+                  )}
                     <span>·</span>
                     <Badge variant={report.status === 'resolved' ? 'default' : 'outline'} className="text-xs">
                       {report.status === 'resolved' ? 'จัดการแล้ว' : report.status === 'reviewed' ? 'ตรวจสอบแล้ว' : 'รอดำเนินการ'}
