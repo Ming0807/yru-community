@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 const CODE_LANGUAGES: Record<string, string> = {
   javascript: 'JavaScript',
@@ -22,41 +22,30 @@ const CODE_LANGUAGES: Record<string, string> = {
 
 export default function PostContent({ html }: { html: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [copiedMap, setCopiedMap] = useState<Map<number, boolean>>(new Map());
-
-  const handleCopy = useCallback((index: number, codeText: string) => {
-    navigator.clipboard.writeText(codeText).catch(() => {});
-    setCopiedMap(prev => {
-      const next = new Map(prev);
-      next.set(index, true);
-      return next;
-    });
-    setTimeout(() => {
-      setCopiedMap(prev => {
-        const next = new Map(prev);
-        next.set(index, false);
-        return next;
-      });
-    }, 2000);
-  }, []);
+  const enhancedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const pres = containerRef.current.querySelectorAll('pre:not(.enhanced)');
-    pres.forEach((pre, index) => {
+    pres.forEach((pre) => {
       const codeEl = pre.querySelector('code');
       if (!codeEl) return;
+
+      const codeText = codeEl.textContent || '';
+      // Create a unique ID based on content to prevent re-enhancing
+      const blockId = `block-${codeText.length}-${codeText.substring(0, 20).replace(/\s/g, '_')}`;
+
+      if (enhancedRef.current.has(blockId)) return;
+      enhancedRef.current.add(blockId);
 
       const langClass = codeEl.className.match(/language-(\w+)/);
       const lang = langClass ? langClass[1] : 'plaintext';
       const langLabel = CODE_LANGUAGES[lang] || 'Plain Text';
-      const codeText = codeEl.textContent || '';
 
       // Create wrapper
       const wrapper = document.createElement('div');
       wrapper.className = 'code-block-wrapper';
-      wrapper.dataset.index = String(index);
 
       // Create header
       const header = document.createElement('div');
@@ -69,7 +58,6 @@ export default function PostContent({ html }: { html: string }) {
       const copyBtn = document.createElement('button');
       copyBtn.type = 'button';
       copyBtn.className = 'code-copy-btn';
-      copyBtn.dataset.index = String(index);
       copyBtn.innerHTML = `
         <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         <span class="copy-text">คัดลอก</span>
@@ -78,7 +66,19 @@ export default function PostContent({ html }: { html: string }) {
       copyBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        handleCopy(index, codeText);
+        navigator.clipboard.writeText(codeText).catch(() => {});
+
+        const copyTextEl = copyBtn.querySelector('.copy-text');
+        const iconEl = copyBtn.querySelector('.copy-icon');
+        if (copyTextEl) copyTextEl.textContent = 'แล้ว';
+        if (iconEl) iconEl.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+        copyBtn.classList.add('copied');
+
+        setTimeout(() => {
+          if (copyTextEl) copyTextEl.textContent = 'คัดลอก';
+          if (iconEl) iconEl.innerHTML = '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>';
+          copyBtn.classList.remove('copied');
+        }, 2000);
       });
 
       header.appendChild(langLabelEl);
@@ -99,28 +99,7 @@ export default function PostContent({ html }: { html: string }) {
       (pre as HTMLElement).style.background = 'transparent';
       (pre as HTMLElement).style.padding = '0';
     });
-  }, [html, handleCopy]);
-
-  // Update copy button states reactively
-  useEffect(() => {
-    if (!containerRef.current) return;
-    copiedMap.forEach((isCopied, index) => {
-      const btn = containerRef.current?.querySelector(`.code-copy-btn[data-index="${index}"]`);
-      if (!btn) return;
-      const copyText = btn.querySelector('.copy-text');
-      const icon = btn.querySelector('.copy-icon');
-
-      if (isCopied) {
-        btn.classList.add('copied');
-        if (copyText) copyText.textContent = 'แล้ว';
-        if (icon) icon.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
-      } else {
-        btn.classList.remove('copied');
-        if (copyText) copyText.textContent = 'คัดลอก';
-        if (icon) icon.innerHTML = '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>';
-      }
-    });
-  }, [copiedMap]);
+  }, [html]);
 
   return (
     <div
