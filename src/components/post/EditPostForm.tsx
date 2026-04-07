@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, X } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -175,14 +175,28 @@ export default function EditPostForm({ post }: EditPostFormProps) {
             </button>
           </div>
 
-          <Button
-            type="submit"
-            disabled={submitting || !title.trim() || !contentText.trim()}
-            className="w-full h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
-          >
-            <Send className="h-4 w-4" />
-            {submitting ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
-          </Button>
+          <div className="sticky bottom-4 z-40">
+            <div className="rounded-2xl border border-border/60 bg-background/95 backdrop-blur-xl shadow-lg p-4">
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push(`/post/${post.id}`)}
+                  className="flex-1 h-12 rounded-xl text-base gap-2"
+                >
+                  <X className="h-4 w-4" /> ยกเลิก
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || !title.trim() || !contentText.trim()}
+                  className="flex-1 h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  {submitting ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </form>
       </main>
     </div>

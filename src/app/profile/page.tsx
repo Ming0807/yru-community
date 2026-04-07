@@ -46,7 +46,7 @@ export default async function ProfilePage() {
   // Pre-fetch first 10 posts for fast initial SSR load
   const { data: initialMyPosts } = await supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)')
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
     .eq('author_id', user.id)
     .order('created_at', { ascending: false })
     .range(0, 9);
@@ -54,7 +54,7 @@ export default async function ProfilePage() {
   // Pre-fetch first 10 bookmarks for fast SSR load
   const { data: initialBookmarksData } = await supabase
     .from('bookmarks')
-    .select('post:posts(*, author:profiles(*), category:categories(*))')
+    .select('post:posts(*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon))')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .range(0, 9);

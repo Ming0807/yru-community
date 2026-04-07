@@ -108,7 +108,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
                   key={tag}
                   href={`/search?q=${encodeURIComponent(tag)}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center rounded-md bg-(--color-yru-green)/10 text-(--color-yru-green-dark) text-[11px] px-2 py-0.5 hover:bg-(--color-yru-green) hover:text-white transition-all duration-200 font-medium"
+                  className="inline-flex items-center rounded-md bg-(--color-yru-green)/10 text-(--color-yru-green) dark:text-emerald-400 text-[11px] px-2 py-0.5 hover:bg-(--color-yru-green) hover:text-white transition-all duration-200 font-medium"
                   title={`ค้นหา #${tag}`}
                 >
                   #{tag}

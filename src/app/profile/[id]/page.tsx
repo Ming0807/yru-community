@@ -141,11 +141,11 @@ async function UserPosts({ userId }: { userId: string }) {
   const supabase = await createClient();
   const { data: posts } = await supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)')
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
     .eq('author_id', userId)
     .eq('is_anonymous', false)
     .order('created_at', { ascending: false })
-    .range(0, 9); // PRE-FETCH 10 items for first chunk
+    .range(0, 9);
 
   return (
     <ProfileFeedClient 

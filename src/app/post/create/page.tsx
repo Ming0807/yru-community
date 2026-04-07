@@ -348,15 +348,29 @@ export default function CreatePostPage() {
             </button>
           </div>
 
-          {/* Submit */}
-          <Button
-            type="submit"
-            disabled={submitting || !title.trim() || !contentText.trim()}
-            className="w-full h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
-          >
-            <Send className="h-4 w-4" />
-            {submitting ? 'กำลังโพสต์...' : 'โพสต์กระทู้'}
-          </Button>
+          {/* Submit & Cancel - Sticky */}
+          <div className="sticky bottom-4 z-40">
+            <div className="rounded-2xl border border-border/60 bg-background/95 backdrop-blur-xl shadow-lg p-4">
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push('/')}
+                  className="flex-1 h-12 rounded-xl text-base gap-2"
+                >
+                  <X className="h-4 w-4" /> ยกเลิก
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || !title.trim() || !contentText.trim()}
+                  className="flex-1 h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  {submitting ? 'กำลังโพสต์...' : 'โพสต์กระทู้'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </form>
       </main>
     </div>

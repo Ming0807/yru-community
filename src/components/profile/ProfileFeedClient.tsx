@@ -31,7 +31,7 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
     if (feedType === 'my_posts' || feedType === 'user_posts') {
       let query = supabase
         .from('posts')
-        .select('*, author:profiles(*), category:categories(*)')
+        .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
         .eq('author_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -47,7 +47,7 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
     } else if (feedType === 'bookmarks') {
       const { data } = await supabase
         .from('bookmarks')
-        .select('post:posts(*, author:profiles(*), category:categories(*))')
+        .select('post:posts(*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon))')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to);

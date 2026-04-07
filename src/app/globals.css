@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -290,36 +291,141 @@
 }
 
 /* Post content rendering styles */
-.post-content h1 { font-size: 1.75rem; font-weight: 700; margin: 1.5rem 0 0.75rem; }
-.post-content h2 { font-size: 1.375rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
-.post-content h3 { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+.post-content {
+  color: var(--foreground);
+}
+
+.post-content h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.75rem;
+  color: var(--foreground);
+}
+
+.post-content h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  color: var(--foreground);
+}
+
+.post-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  color: var(--foreground);
+}
+
+.post-content p {
+  color: var(--foreground);
+  line-height: 1.7;
+}
+
+.post-content ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  color: var(--foreground);
+}
+
+.post-content ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+  color: var(--foreground);
+}
+
+.post-content li {
+  color: var(--foreground);
+  margin: 0.25rem 0;
+}
+
 .post-content blockquote {
   border-left: 3px solid var(--color-yru-pink);
   padding-left: 1rem;
   margin: 1rem 0;
   font-style: italic;
-  color: oklch(0.55 0 0);
+  color: var(--muted-foreground);
 }
-.dark .post-content blockquote { color: oklch(0.7 0 0); }
+
 .post-content pre {
-  background: oklch(0.15 0.01 260);
-  color: oklch(0.9 0 0);
+  background: oklch(0.18 0.01 270);
+  color: oklch(0.92 0.005 270);
   padding: 1rem;
   border-radius: 0.75rem;
   overflow-x: auto;
   margin: 1rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
+
+.post-content pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
 .post-content code {
   background: oklch(0.93 0.003 260);
+  color: var(--color-yru-pink-dark);
   padding: 0.15em 0.4em;
   border-radius: 0.25rem;
+  font-family: var(--font-mono);
   font-size: 0.875em;
 }
-.dark .post-content code { background: oklch(0.25 0.01 260); }
-.post-content ul { list-style: disc; padding-left: 1.5rem; }
-.post-content ol { list-style: decimal; padding-left: 1.5rem; }
-.post-content a { color: var(--color-yru-pink); text-decoration: underline; }
-.post-content iframe { border-radius: 0.75rem; width: 100%; aspect-ratio: 16/9; }
+
+.post-content a {
+  color: var(--color-yru-pink);
+  text-decoration: underline;
+}
+
+.post-content iframe {
+  border-radius: 0.75rem;
+  width: 100%;
+  aspect-ratio: 16/9;
+}
+
+.post-content img {
+  border-radius: 0.75rem;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem 0;
+}
+
+.post-content hr {
+  border-color: var(--border);
+  margin: 1.5rem 0;
+}
+
+.post-content strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.post-content em {
+  color: var(--foreground);
+  font-style: italic;
+}
+
+/* Dark mode overrides for post content */
+.dark .post-content blockquote {
+  color: oklch(0.7 0.005 270);
+}
+
+.dark .post-content pre {
+  background: oklch(0.2 0.01 270);
+  color: oklch(0.92 0.005 270);
+  border: 1px solid oklch(0.25 0.01 270);
+}
+
+.dark .post-content code {
+  background: oklch(0.22 0.01 270);
+  color: oklch(0.82 0.06 3);
+}
+
+.dark .post-content a {
+  color: oklch(0.78 0.1 3);
+}
 
 /* ==========================================
    Scrollbar Styles

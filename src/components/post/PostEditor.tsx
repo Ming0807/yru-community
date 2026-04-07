@@ -97,7 +97,7 @@ export default function PostEditor({ content, onChange }: PostEditorProps) {
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm max-w-none focus:outline-none min-h-[300px] px-5 py-4',
+          'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[300px] px-5 py-4',
       },
     },
     onUpdate: ({ editor }) => {
@@ -158,8 +158,8 @@ export default function PostEditor({ content, onChange }: PostEditorProps) {
 
   return (
     <div className="tiptap-editor rounded-xl border border-border bg-card overflow-hidden shadow-sm transition-shadow focus-within:ring-1 focus-within:ring-(--color-yru-pink)/30 focus-within:border-(--color-yru-pink)/50">
-      {/* Premium Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-border/60 px-3 py-2 bg-muted/20">
+      {/* Sticky Toolbar */}
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b border-border/60 px-3 py-2 bg-muted/20 backdrop-blur-sm">
         
         {/* History */}
         <div className="flex items-center gap-0.5 mr-1">
@@ -316,8 +316,8 @@ export default function PostEditor({ content, onChange }: PostEditorProps) {
 
       </div>
 
-      {/* Editor Content Area */}
-      <div className="bg-background">
+      {/* Editor Content Area - Fixed height with scroll */}
+      <div className="bg-background max-h-[50vh] overflow-y-auto custom-scrollbar">
         <EditorContent editor={editor} />
       </div>
     </div>
