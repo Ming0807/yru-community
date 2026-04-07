@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Loader2, Save, User, Settings, Shield, Bell, BellOff, Trash2, AlertTriangle } from 'lucide-react';
+import { Camera, Loader2, Save, User, Settings, Shield, Bell, BellOff, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { useUser } from '@/components/UserProvider';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import DeleteAccountDialog from '@/components/settings/DeleteAccountDialog';
+import ExportData from '@/components/settings/ExportData';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -308,6 +309,15 @@ export default function SettingsPage() {
               </div>
             </section>
           )}
+
+          {/* Privacy & Data */}
+          <section className="rounded-2xl border bg-card p-6 shadow-sm">
+            <h2 className="text-base font-semibold flex items-center gap-2 mb-4">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              ข้อมูลส่วนบุคคล (PDPA)
+            </h2>
+            {currentUser && <ExportData user={currentUser} />}
+          </section>
 
           {/* Danger Zone */}
           <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 shadow-sm">
