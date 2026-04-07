@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -9,6 +9,8 @@ import {
   FileText,
   Image as ImageIcon,
   Send,
+  FileBadge,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -20,6 +22,20 @@ import { CATEGORIES, UPLOAD_LIMITS } from '@/lib/constants';
 import { formatFileSize } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { Attachment } from '@/types';
+
+const DRAFT_KEY = 'yru_post_draft';
+const AUTO_SAVE_DELAY = 5000;
+
+interface DraftData {
+  title: string;
+  categorySlug: string;
+  tags: string;
+  isAnonymous: boolean;
+  contentJson: Record<string, unknown>;
+  contentText: string;
+  attachments: Attachment[];
+  savedAt: string;
+}
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -34,6 +50,57 @@ export default function CreatePostPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const draft: DraftData = JSON.parse(saved);
+        setTitle(draft.title || '');
+        setCategorySlug(draft.categorySlug || 'general');
+        setTags(draft.tags || '');
+        setIsAnonymous(draft.isAnonymous || false);
+        setContentJson(draft.contentJson || {});
+        setContentText(draft.contentText || '');
+        setAttachments(draft.attachments || []);
+        setHasDraft(true);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, []);
+
+  // Auto-save draft with debounce
+  const saveDraftToStorage = useCallback(() => {
+    const draft: DraftData = {
+      title,
+      categorySlug,
+      tags,
+      isAnonymous,
+      contentJson,
+      contentText,
+      attachments,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    setHasDraft(true);
+  }, [title, categorySlug, tags, isAnonymous, contentJson, contentText, attachments]);
+
+  useEffect(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (title.trim() || contentText.trim()) {
+        saveDraftToStorage();
+      }
+    }, AUTO_SAVE_DELAY);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [title, categorySlug, tags, isAnonymous, contentJson, contentText, attachments, saveDraftToStorage]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -62,7 +129,6 @@ export default function CreatePostPage() {
 
       try {
         if (isImage) {
-          // Upload to Cloudinary via API route
           const formData = new FormData();
           formData.append('file', file);
           formData.append('type', 'image');
@@ -85,7 +151,6 @@ export default function CreatePostPage() {
             },
           ]);
         } else {
-          // Upload PDF to Supabase Storage
           const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
           const fileName = `${Date.now()}-${cleanFileName}`;
           const { data, error } = await supabase.storage
@@ -123,6 +188,70 @@ export default function CreatePostPage() {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const saveDraft = async () => {
+    if (!title.trim() && !contentText.trim()) {
+      toast.info('กรุณาใส่หัวข้อหรือเนื้อหาก่อนบันทึกแบบร่าง');
+      return;
+    }
+
+    setSavingDraft(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('กรุณาเข้าสู่ระบบ');
+        router.push('/login');
+        return;
+      }
+
+      const { data: cat } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', categorySlug)
+        .single();
+
+      if (!cat) {
+        toast.error('หมวดหมู่ไม่ถูกต้อง');
+        return;
+      }
+
+      const tagArray = tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const { data: post, error } = await supabase
+        .from('posts')
+        .insert({
+          author_id: user.id,
+          category_id: cat.id,
+          title: title.trim() || 'แบบร่าง',
+          content: contentJson,
+          content_text: contentText,
+          is_anonymous: isAnonymous,
+          tags: tagArray,
+          attachments: attachments,
+          is_draft: true,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      // Clear localStorage draft
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
+
+      toast.success('บันทึกแบบร่างสำเร็จ!');
+      router.push(`/post/${post.id}/edit`);
+    } catch {
+      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -147,7 +276,6 @@ export default function CreatePostPage() {
         return;
       }
 
-      // Get category id
       const { data: cat } = await supabase
         .from('categories')
         .select('id')
@@ -175,11 +303,16 @@ export default function CreatePostPage() {
           is_anonymous: isAnonymous,
           tags: tagArray,
           attachments: attachments,
+          is_draft: false,
         })
         .select('id')
         .single();
 
       if (error) throw error;
+
+      // Clear localStorage draft
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
 
       toast.success('ตั้งกระทู้สำเร็จ!');
       router.push(`/post/${post.id}`);
@@ -201,6 +334,11 @@ export default function CreatePostPage() {
             </Button>
           </Link>
           <h1 className="font-semibold">ตั้งกระทู้ใหม่</h1>
+          {hasDraft && (
+            <Badge variant="outline" className="ml-auto text-xs">
+              <FileBadge className="h-3 w-3 mr-1" /> มีแบบร่าง
+            </Badge>
+          )}
         </div>
       </header>
 
@@ -361,9 +499,23 @@ export default function CreatePostPage() {
                   <X className="h-4 w-4" /> ยกเลิก
                 </Button>
                 <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={saveDraft}
+                  disabled={savingDraft}
+                  className="h-12 rounded-xl text-base gap-2"
+                >
+                  {savingDraft ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileBadge className="h-4 w-4" />
+                  )}
+                  บันทึกแบบร่าง
+                </Button>
+                <Button
                   type="submit"
                   disabled={submitting || !title.trim() || !contentText.trim()}
-                  className="flex-1 h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
+                  className="flex-[2] h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90 transition-all gap-2"
                 >
                   <Send className="h-4 w-4" />
                   {submitting ? 'กำลังโพสต์...' : 'โพสต์กระทู้'}

@@ -43,6 +43,7 @@ export interface Post {
   created_at: string;
   updated_at: string;
   is_pinned?: boolean;
+  is_draft?: boolean;
   // Joined fields
   author?: Profile;
   category?: Category;
