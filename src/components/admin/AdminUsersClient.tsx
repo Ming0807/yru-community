@@ -289,6 +289,10 @@ export default function AdminUsersClient({ initialUsers, totalCount }: Props) {
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-(--color-yru-pink)">
                           <Shield className="h-3.5 w-3.5" /> แอดมิน
                         </span>
+                      ) : user.role === 'moderator' ? (
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-500">
+                          <Shield className="h-3.5 w-3.5" /> ผู้ดูแล
+                        </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">ผู้ใช้ทั่วไป</span>
                       )}

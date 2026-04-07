@@ -10,7 +10,7 @@ export interface Profile {
   faculty: string | null;
   major: string | null;
   avatar_url: string | null;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'moderator' | 'user';
   status?: 'active' | 'suspended' | 'banned';
   experience_points?: number;
   level?: number;
