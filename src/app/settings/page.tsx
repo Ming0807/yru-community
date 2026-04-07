@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Loader2, Save, User, Settings, Shield } from 'lucide-react';
+import { Camera, Loader2, Save, User, Settings, Shield, Bell, BellOff } from 'lucide-react';
 import { useUser } from '@/components/UserProvider';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isSupported, isSubscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications();
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -271,6 +273,40 @@ export default function SettingsPage() {
               />
             </div>
           </section>
+
+          {/* Push Notifications */}
+          {isSupported && (
+            <section className="rounded-2xl border bg-card p-6 shadow-sm">
+              <h2 className="text-base font-semibold flex items-center gap-2 mb-4">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                การแจ้งเตือนบนเบราว์เซอร์
+              </h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">เปิดการแจ้งเตือน Push</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    รับการแจ้งเตือนเมื่อมีกิจกรรมใหม่ แม้จะไม่ได้เปิดเว็บอยู่
+                  </p>
+                </div>
+                <Button
+                  variant={isSubscribed ? 'outline' : 'default'}
+                  size="sm"
+                  onClick={isSubscribed ? unsubscribe : subscribe}
+                  disabled={pushLoading}
+                  className="gap-2 rounded-xl"
+                >
+                  {pushLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isSubscribed ? (
+                    <Bell className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <BellOff className="h-4 w-4" />
+                  )}
+                  {isSubscribed ? 'เปิดอยู่' : 'เปิดใช้งาน'}
+                </Button>
+              </div>
+            </section>
+          )}
 
           {/* Save Button */}
           <div className="flex items-center justify-between sticky bottom-20 sm:bottom-4">
