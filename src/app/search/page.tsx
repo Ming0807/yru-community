@@ -10,7 +10,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 interface SearchPageProps {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string; date?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; sort?: string; date?: string; author?: string }>;
 }
 
 export async function generateMetadata({
@@ -26,22 +26,29 @@ async function SearchResults({
   query, 
   category, 
   sort,
-  date 
+  date,
+  author
 }: { 
   query: string; 
   category?: string;
   sort?: string;
   date?: string;
+  author?: string;
 }) {
   const supabase = await createClient();
 
   let dbQuery = supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)');
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)');
 
   // Text search
   if (query) {
     dbQuery = dbQuery.textSearch('search_vector', query, { type: 'plain' });
+  }
+
+  // Author filter
+  if (author) {
+    dbQuery = dbQuery.ilike('author.display_name', `%${author}%`);
   }
 
   // Category filter
@@ -130,6 +137,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const category = params.category ?? '';
   const sort = params.sort ?? 'latest';
   const date = params.date ?? '';
+  const author = params.author ?? '';
 
   // Build URL helper
   const buildUrl = (overrides: Record<string, string>) => {
@@ -138,6 +146,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     if (category) p.set('category', category);
     if (sort && sort !== 'latest') p.set('sort', sort);
     if (date) p.set('date', date);
+    if (author) p.set('author', author);
     Object.entries(overrides).forEach(([k, v]) => {
       if (v) p.set(k, v); else p.delete(k);
     });
@@ -174,6 +183,31 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         {/* Filters */}
         <div className="space-y-3 mb-6 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
+          {/* Author search input */}
+          <div className="flex gap-2">
+            <form className="flex-1 flex gap-2" action="/search" method="GET">
+              <input type="hidden" name="q" value={query} />
+              <input type="hidden" name="category" value={category} />
+              <input type="hidden" name="sort" value={sort !== 'latest' ? sort : ''} />
+              <input type="hidden" name="date" value={date} />
+              <input
+                type="text"
+                name="author"
+                defaultValue={author}
+                placeholder="ค้นหาตามชื่อผู้โพสต์..."
+                className="flex-1 h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button type="submit" className="px-3 py-1.5 rounded-xl bg-[var(--color-yru-pink)] text-white text-sm font-medium hover:opacity-90">
+                ค้นหา
+              </button>
+            </form>
+            {author && (
+              <Link href={buildUrl({ author: '' })} className="px-3 py-1.5 rounded-xl border text-sm hover:bg-muted">
+                ล้าง
+              </Link>
+            )}
+          </div>
+
           {/* Category filter */}
           <div className="flex flex-wrap gap-1.5">
             <FilterChip href={buildUrl({ category: '' })} active={!category}>
@@ -230,7 +264,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               </div>
             }
           >
-            <SearchResults query={query} category={category} sort={sort} date={date} />
+            <SearchResults query={query} category={category} sort={sort} date={date} author={author} />
           </Suspense>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
