@@ -28,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import VoteButton from '@/components/post/VoteButton';
 import BookmarkButton from '@/components/post/BookmarkButton';
 import ShareButton from '@/components/post/ShareButton';
+import PostContent from '@/components/post/PostContent';
 import CommentSection from '@/components/post/CommentSection';
 import Header from '@/components/layout/Header';
 import MobileNav from '@/components/layout/MobileNav';
@@ -256,12 +257,7 @@ export default async function PostPage({ params }: PostPageProps) {
           </div>
 
           {/* Content */}
-          <div
-            className="post-content prose prose-sm max-w-none text-foreground/90 leading-relaxed mb-6"
-            dangerouslySetInnerHTML={{
-              __html: renderContent(post.content as Record<string, unknown>),
-            }}
-          />
+          <PostContent html={renderContent(post.content as Record<string, unknown>)} />
 
           {/* Tags */}
           {post.tags && post.tags.length > 0 && (
