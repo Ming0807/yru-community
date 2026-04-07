@@ -93,13 +93,16 @@ export default async function PostPage({ params }: PostPageProps) {
   } = await supabase.auth.getUser();
 
   // Get post with author and category
-  const { data: post } = await supabase
+  const { data: post, error: postError } = await supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)')
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty, role), category:categories!posts_category_id_fkey(id, name, slug, icon)')
     .eq('id', id)
     .single();
 
-  if (!post) notFound();
+  if (postError || !post) {
+    console.error('[PostPage] Error fetching post:', postError);
+    notFound();
+  }
 
   // Increment view count (fire and forget)
   supabase
