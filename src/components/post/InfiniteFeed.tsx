@@ -76,7 +76,8 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
 
       let query = supabase
         .from('posts')
-        .select('*, author:profiles(*), category:categories(*)');
+        .select('*, author:profiles(*), category:categories(*)')
+        .eq('is_draft', false);
 
       query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
 

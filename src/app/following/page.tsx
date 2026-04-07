@@ -87,6 +87,7 @@ async function FollowingFeed({ followingIds }: { followingIds: string[] }) {
     .from('posts')
     .select('*, author:profiles(*), category:categories(*)')
     .in('author_id', followingIds)
+    .eq('is_draft', false)
     .order('created_at', { ascending: false })
     .limit(20);
 

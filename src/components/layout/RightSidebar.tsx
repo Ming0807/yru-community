@@ -27,6 +27,7 @@ export default async function RightSidebar({
   const { data: trendingPosts } = await supabase
     .from('posts')
     .select('id, title, vote_count, comment_count, created_at, category_id')
+    .eq('is_draft', false)
     .gte('created_at', sevenDaysAgo.toISOString())
     .order('vote_count', { ascending: false })
     .limit(5);

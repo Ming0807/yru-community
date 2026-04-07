@@ -54,7 +54,8 @@ export default async function CategoryPage({
   let query = supabase
     .from('posts')
     .select('*, author:profiles(*), category:categories(*)', { count: 'exact' })
-    .eq('category_id', dbCat.id);
+    .eq('category_id', dbCat.id)
+    .eq('is_draft', false);
 
   if (sort === 'top') {
     query = query.order('vote_count', { ascending: false });

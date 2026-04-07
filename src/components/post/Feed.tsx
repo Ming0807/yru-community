@@ -17,7 +17,8 @@ export default async function Feed({ sort, page }: FeedProps) {
   // Build query
   let query = supabase
     .from('posts')
-    .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)', { count: 'exact' });
+    .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)', { count: 'exact' })
+    .eq('is_draft', false);
 
   // Filter out soft-deleted posts (only if column exists)
   try {

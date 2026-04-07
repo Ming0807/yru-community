@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import PostCard from '@/components/post/PostCard';
 import PostSkeleton from '@/components/post/PostSkeleton';
-import { Inbox, BookOpen, Bookmark } from 'lucide-react';
+import { Inbox, BookOpen, Bookmark, FileBadge, FileX } from 'lucide-react';
 import type { Post } from '@/types';
+import Link from 'next/link';
 
 interface ProfileFeedProps {
   userId: string;
-  feedType: 'my_posts' | 'bookmarks' | 'user_posts';
+  feedType: 'my_posts' | 'bookmarks' | 'user_posts' | 'drafts';
   initialPosts: Post[];
 }
 
@@ -33,15 +34,26 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
         .from('posts')
         .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
         .eq('author_id', userId)
+        .eq('is_draft', false)
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      // สำหรับโพรไฟล์สาธารณะ ซ่อนโพสต์แบบไม่ระบุตัวตน
       if (feedType === 'user_posts') {
         query = query.eq('is_anonymous', false);
       }
 
       const { data } = await query;
+      newData = data ?? [];
+
+    } else if (feedType === 'drafts') {
+      const { data } = await supabase
+        .from('posts')
+        .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
+        .eq('author_id', userId)
+        .eq('is_draft', true)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
       newData = data ?? [];
 
     } else if (feedType === 'bookmarks') {
@@ -71,6 +83,8 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
       <div className="py-20 text-center border rounded-xl border-dashed bg-card/50">
         {feedType === 'bookmarks' ? (
           <Bookmark className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+        ) : feedType === 'drafts' ? (
+          <FileX className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
         ) : feedType === 'my_posts' ? (
           <Inbox className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
         ) : (
@@ -78,14 +92,16 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
         )}
         
         <h3 className="text-lg font-medium text-foreground">
-          {feedType === 'bookmarks' ? 'ยังไม่มีกระทู้ที่บันทึกไว้' : 'ยังไม่มีโพสต์'}
+          {feedType === 'bookmarks' ? 'ยังไม่มีกระทู้ที่บันทึกไว้' : feedType === 'drafts' ? 'ยังไม่มีแบบร่าง' : 'ยังไม่มีโพสต์'}
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
           {feedType === 'bookmarks' 
             ? 'บันทึกกระทู้ที่สนใจเพื่อไว้อ่านทีหลังได้'
-            : feedType === 'my_posts' 
-              ? 'คุณยังไม่ได้ตั้งกระทู้ใดๆ ในชุมชน'
-              : 'ผู้ใช้นี้ยังไม่ได้ตั้งกระทู้ใดๆ'}
+            : feedType === 'drafts'
+              ? 'บันทึกแบบร่างเพื่อเขียนต่อทีหลังได้'
+              : feedType === 'my_posts' 
+                ? 'คุณยังไม่ได้ตั้งกระทู้ใดๆ ในชุมชน'
+                : 'ผู้ใช้นี้ยังไม่ได้ตั้งกระทู้ใดๆ'}
         </p>
       </div>
     );
@@ -94,7 +110,16 @@ export default function ProfileFeedClient({ userId, feedType, initialPosts }: Pr
   return (
     <div className="space-y-4 animate-fade-in">
       {posts.map((post, idx) => (
-        <PostCard key={`${post.id}-${idx}`} post={post} index={idx} />
+        <div key={`${post.id}-${idx}`} className="relative">
+          {feedType === 'drafts' && (
+            <Link href={`/post/${post.id}/edit`} className="block">
+              <PostCard post={post} index={idx} />
+            </Link>
+          )}
+          {feedType !== 'drafts' && (
+            <PostCard post={post} index={idx} />
+          )}
+        </div>
       ))}
       
       {hasMore && (

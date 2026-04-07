@@ -39,7 +39,8 @@ async function SearchResults({
 
   let dbQuery = supabase
     .from('posts')
-    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)');
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
+    .eq('is_draft', false);
 
   // Text search
   if (query) {

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import UserBadge, { ExpProgress } from '@/components/UserBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, BookOpen, Bookmark, Activity } from 'lucide-react';
+import { Settings, LogOut, BookOpen, Bookmark, Activity, FileBadge } from 'lucide-react';
 import Link from 'next/link';
 
 // Component for rendering profile feeds, handling its own loading state
@@ -43,15 +43,16 @@ export default async function ProfilePage() {
     redirect('/login');
   }
 
-  // Pre-fetch first 10 posts for fast initial SSR load
+  // Pre-fetch first 10 posts for fast initial SSR load (exclude drafts)
   const { data: initialMyPosts } = await supabase
     .from('posts')
     .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
     .eq('author_id', user.id)
+    .eq('is_draft', false)
     .order('created_at', { ascending: false })
     .range(0, 9);
 
-  // Pre-fetch first 10 bookmarks for fast SSR load
+  // Pre-fetch first 10 bookmarks for fast SSR load (exclude drafts)
   const { data: initialBookmarksData } = await supabase
     .from('bookmarks')
     .select('post:posts(*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon))')
@@ -62,6 +63,15 @@ export default async function ProfilePage() {
   const initialBookmarks = initialBookmarksData 
     ? initialBookmarksData.map(b => b.post).filter(Boolean) as unknown as Post[]
     : [];
+
+  // Pre-fetch drafts (only for own profile)
+  const { data: initialDrafts } = await supabase
+    .from('posts')
+    .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
+    .eq('author_id', user.id)
+    .eq('is_draft', true)
+    .order('created_at', { ascending: false })
+    .range(0, 9);
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0 relative">
@@ -128,7 +138,14 @@ export default async function ProfilePage() {
                   className="flex-1 rounded-lg data-[state=active]:bg-(--color-yru-pink) data-[state=active]:text-white data-[state=active]:shadow h-10"
                 >
                   <BookOpen className="mr-2 h-4 w-4" />
-                  กระทู้ของฉัน
+                  กระทู้
+                </TabsTrigger>
+                <TabsTrigger
+                  value="drafts"
+                  className="flex-1 rounded-lg data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow h-10"
+                >
+                  <FileBadge className="mr-2 h-4 w-4" />
+                  แบบร่าง
                 </TabsTrigger>
                 <TabsTrigger
                   value="bookmarks"
@@ -151,6 +168,14 @@ export default async function ProfilePage() {
                   userId={user.id} 
                   feedType="my_posts" 
                   initialPosts={(initialMyPosts as unknown as Post[]) ?? []} 
+                />
+              </TabsContent>
+
+              <TabsContent value="drafts" className="mt-0 outline-none">
+                <ProfileFeedClient 
+                  userId={user.id} 
+                  feedType="drafts" 
+                  initialPosts={(initialDrafts as unknown as Post[]) ?? []} 
                 />
               </TabsContent>
 

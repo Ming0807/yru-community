@@ -73,6 +73,7 @@ function SearchInput() {
       const { data } = await supabase
         .from('posts')
         .select('id, title, created_at, is_anonymous, author:profiles(display_name, avatar_url)')
+        .eq('is_draft', false)
         .ilike('title', `%${query.trim()}%`)
         .order('created_at', { ascending: false })
         .limit(5);
