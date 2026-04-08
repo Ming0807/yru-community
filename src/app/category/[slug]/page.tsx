@@ -10,6 +10,8 @@ import type { SortOption } from '@/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ sort?: string; page?: string }>;
@@ -96,6 +98,7 @@ export default async function CategoryPage({
             <Link
               key={opt.value}
               href={`/category/${slug}?sort=${opt.value}`}
+              prefetch={false}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 sort === opt.value
                   ? 'bg-foreground text-background'
@@ -130,6 +133,7 @@ export default async function CategoryPage({
             {page > 1 && (
               <Link
                 href={`/category/${slug}?sort=${sort}&page=${page - 1}`}
+                prefetch={false}
                 className="rounded-lg bg-muted px-4 py-2 text-sm hover:bg-muted/80"
               >
                 ← ก่อนหน้า
@@ -141,6 +145,7 @@ export default async function CategoryPage({
             {page < totalPages && (
               <Link
                 href={`/category/${slug}?sort=${sort}&page=${page + 1}`}
+                prefetch={false}
                 className="rounded-lg bg-muted px-4 py-2 text-sm hover:bg-muted/80"
               >
                 ถัดไป →

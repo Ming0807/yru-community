@@ -122,6 +122,7 @@ export default function SettingsPage() {
       if (error) throw error;
 
       await refresh();
+      router.refresh();
       setHasChanges(false);
       toast.success('บันทึกการตั้งค่าสำเร็จ!');
     } catch {

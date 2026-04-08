@@ -55,7 +55,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
             <span>ไม่ระบุตัวตน</span>
           </div>
         ) : post.author ? (
-          <Link href={`/profile/${post.author.id}`} onClick={(e) => e.stopPropagation()}>
+          <Link href={`/profile/${post.author.id}`} onClick={(e) => e.stopPropagation()} prefetch={false}>
             <div className="flex items-center gap-1.5 font-medium text-foreground py-0.5 hover:text-(--color-yru-pink) hover:underline transition-all">
               {post.author.avatar_url ? (
                 <img 

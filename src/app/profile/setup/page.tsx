@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/components/UserProvider';
 import { FACULTIES, UPLOAD_LIMITS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
+  const { refresh } = useUser();
   const supabase = createClient();
 
   const [displayName, setDisplayName] = useState('');
@@ -128,6 +130,9 @@ export default function ProfileSetupPage() {
         });
 
       if (error) throw error;
+
+      await refresh();
+      router.refresh();
 
       toast.success('บันทึกโปรไฟล์สำเร็จ!');
       router.push('/');

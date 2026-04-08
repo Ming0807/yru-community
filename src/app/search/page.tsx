@@ -9,6 +9,8 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 interface SearchPageProps {
   searchParams: Promise<{ q?: string; category?: string; sort?: string; date?: string; author?: string }>;
 }
@@ -120,6 +122,7 @@ function FilterChip({ href, active, children }: { href: string; active: boolean;
   return (
     <Link
       href={href}
+      prefetch={false}
       className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
         active
           ? 'bg-foreground text-background shadow-sm'

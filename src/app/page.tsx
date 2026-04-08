@@ -9,6 +9,8 @@ import Feed from '@/components/post/Feed';
 import PostSkeleton from '@/components/post/PostSkeleton';
 import type { SortOption } from '@/types';
 
+export const dynamic = 'force-dynamic';
+
 interface HomePageProps {
   searchParams: Promise<{ sort?: string; page?: string }>;
 }
@@ -41,6 +43,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <Link
                 key={opt.value}
                 href={`/?sort=${opt.value}`}
+                prefetch={false}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                   sort === opt.value
                     ? 'bg-foreground text-background'
