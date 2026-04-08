@@ -62,6 +62,7 @@ function SearchInput() {
   useEffect(() => {
     if (!query.trim()) {
       setSuggestions([]);
+      setLoading(false);
       return;
     }
 
@@ -70,17 +71,44 @@ function SearchInput() {
 
     debounceRef.current = setTimeout(async () => {
       const supabase = createClient();
-      const { data } = await supabase
+      const searchTerm = `%${query.trim()}%`;
+      
+      const { data: posts, error } = await supabase
         .from('posts')
-        .select('id, title, created_at, is_anonymous, author:profiles(display_name, avatar_url)')
-        .eq('is_draft', false)
-        .ilike('title', `%${query.trim()}%`)
+        .select('id, author_id, title, created_at, is_anonymous')
+        .or(`title.ilike.${searchTerm},content_text.ilike.${searchTerm}`)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(8);
 
-      setSuggestions(data || []);
+      if (error) {
+        console.error('Search error:', error);
+        setSuggestions([]);
+        setLoading(false);
+        return;
+      }
+
+      if (!posts || posts.length === 0) {
+        setSuggestions([]);
+        setLoading(false);
+        return;
+      }
+
+      const authorIds = [...new Set(posts.map((p: { author_id: string }) => p.author_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', authorIds);
+
+      const profileMap = new Map((profiles || []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p]));
+      
+      const suggestionsWithAuthor = posts.map((post: { id: string; author_id: string; title: string; created_at: string; is_anonymous: boolean }) => ({
+        ...post,
+        author: profileMap.get(post.author_id) || null
+      }));
+      
+      setSuggestions(suggestionsWithAuthor);
       setLoading(false);
-    }, 300);
+    }, 400);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -111,7 +139,7 @@ function SearchInput() {
     setRecent(getRecentSearches());
   };
 
-  const showDropdown = isOpen && (recent.length > 0 || suggestions.length > 0 || loading);
+  const showDropdown = isOpen && (suggestions.length > 0 || loading || (recent.length > 0 && !query.trim()));
 
   return (
     <div ref={containerRef} className="relative w-full">

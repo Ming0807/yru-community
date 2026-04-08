@@ -42,9 +42,8 @@ async function SearchResults({
     .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
     .eq('is_draft', false);
 
-  // Text search
   if (query) {
-    dbQuery = dbQuery.textSearch('search_vector', query, { type: 'plain' });
+    dbQuery = dbQuery.or(`title.ilike.%${query}%,content_text.ilike.%${query}%`);
   }
 
   // Author filter
@@ -89,7 +88,7 @@ async function SearchResults({
     dbQuery = dbQuery.order('created_at', { ascending: false });
   }
 
-  const { data: posts } = await dbQuery.limit(50);
+  const { data: posts } = await dbQuery.limit(30);
 
   if (!posts || posts.length === 0) {
     return (
