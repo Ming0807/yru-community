@@ -19,7 +19,7 @@ import ExportData from '@/components/settings/ExportData';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
-  const { user: currentUser, refresh } = useUser();
+  const { user: currentUser, loading: userLoading, refresh } = useUser();
   const router = useRouter();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +36,9 @@ export default function SettingsPage() {
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
+    // Wait for UserProvider to finish loading before checking auth
+    if (userLoading) return;
+
     if (!currentUser) {
       router.push('/login');
       return;
@@ -47,7 +50,7 @@ export default function SettingsPage() {
     setMajor(currentUser.major || '');
     setAvatarUrl(currentUser.avatar_url || null);
     setLoading(false);
-  }, [currentUser, router]);
+  }, [currentUser, userLoading, router]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,7 +131,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || userLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -250,7 +253,7 @@ export default function SettingsPage() {
                     onClick={() => { setFaculty(f); setHasChanges(true); }}
                     className={`w-full text-left rounded-xl px-4 py-2.5 text-sm transition-all border ${
                       faculty === f
-                        ? 'border-[var(--color-yru-pink)] bg-[var(--color-yru-pink-light)] text-foreground font-medium'
+                        ? 'border-[var(--color-yru-pink)] bg-[var(--color-yru-pink)]/10 dark:bg-[var(--color-yru-pink)]/20 text-foreground font-medium ring-1 ring-[var(--color-yru-pink)]/30'
                         : 'border-border/60 hover:border-border hover:bg-muted/50'
                     }`}
                   >

@@ -15,6 +15,20 @@ function urlBase64ToUint8Array(base64String: string) {
   return new Uint8Array([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+/**
+ * Helper: wait for service worker with a timeout.
+ * navigator.serviceWorker.ready never rejects — it hangs forever if no SW is registered.
+ * This wrapper adds a configurable timeout to prevent infinite loading states.
+ */
+async function waitForServiceWorker(timeoutMs = 5000): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null;
+
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
+}
+
 export function usePushNotifications() {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -27,13 +41,28 @@ export function usePushNotifications() {
       setLoading(false);
       return;
     }
+
+    // Check if VAPID key is available — without it push won't work
+    if (!VAPID_PUBLIC_KEY) {
+      setIsSupported(false);
+      setLoading(false);
+      return;
+    }
+
     setIsSupported(true);
     checkSubscription();
   }, []);
 
   const checkSubscription = async () => {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await waitForServiceWorker(5000);
+      if (!registration) {
+        // Service worker not available or timed out
+        setIsSupported(false);
+        setIsSubscribed(false);
+        setLoading(false);
+        return;
+      }
       const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
     } catch {
@@ -49,18 +78,23 @@ export function usePushNotifications() {
       return;
     }
 
+    setLoading(true);
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        toast.info('กรุณาอนุญาตการแจ้งเตือน');
+        toast.info('กรุณาอนุญาตการแจ้งเตือนในการตั้งค่าเบราว์เซอร์');
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      
+      const registration = await waitForServiceWorker(5000);
+      if (!registration) {
+        toast.error('Service Worker ยังไม่พร้อม กรุณารีเฟรชหน้าแล้วลองใหม่');
+        return;
+      }
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: VAPID_PUBLIC_KEY || undefined,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
       // Save subscription to server
@@ -78,19 +112,31 @@ export function usePushNotifications() {
       setIsSubscribed(true);
       toast.success('เปิดการแจ้งเตือนแล้ว');
     } catch (error: any) {
-      console.error('Subscribe error:', error);
-      toast.error('ไม่สามารถเปิดการแจ้งเตือนได้');
+      console.error('[Push] Subscribe error:', error);
+      if (error?.name === 'NotAllowedError') {
+        toast.error('การแจ้งเตือนถูกบล็อก กรุณาเปิดในการตั้งค่าเบราว์เซอร์');
+      } else {
+        toast.error('ไม่สามารถเปิดการแจ้งเตือนได้');
+      }
+    } finally {
+      setLoading(false);
     }
   }, [isSupported, supabase]);
 
   const unsubscribe = useCallback(async () => {
+    setLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await waitForServiceWorker(5000);
+      if (!registration) {
+        toast.error('Service Worker ยังไม่พร้อม');
+        return;
+      }
+
       const subscription = await registration.pushManager.getSubscription();
-      
+
       if (subscription) {
         await subscription.unsubscribe();
-        
+
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -107,6 +153,8 @@ export function usePushNotifications() {
       toast.success('ปิดการแจ้งเตือนแล้ว');
     } catch {
       toast.error('ไม่สามารถปิดการแจ้งเตือนได้');
+    } finally {
+      setLoading(false);
     }
   }, [supabase]);
 
@@ -116,13 +164,14 @@ export function usePushNotifications() {
 export function PushNotificationToggle() {
   const { isSupported, isSubscribed, loading, subscribe, unsubscribe } = usePushNotifications();
 
-  if (!isSupported || loading) return null;
+  if (!isSupported) return null;
 
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={isSubscribed ? unsubscribe : subscribe}
+      disabled={loading}
       className="gap-2 text-xs"
     >
       {loading ? (

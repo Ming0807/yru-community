@@ -207,7 +207,7 @@ export default function ProfileSetupPage() {
                     onClick={() => setFaculty(f)}
                     className={`w-full text-left rounded-xl px-4 py-2.5 text-sm transition-all border ${
                       faculty === f
-                        ? 'border-[var(--color-yru-pink)] bg-[var(--color-yru-pink-light)] text-foreground font-medium'
+                        ? 'border-[var(--color-yru-pink)] bg-[var(--color-yru-pink)]/10 dark:bg-[var(--color-yru-pink)]/20 text-foreground font-medium ring-1 ring-[var(--color-yru-pink)]/30'
                         : 'border-border/60 hover:border-border hover:bg-muted/50'
                     }`}
                   >

@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Download, Check } from 'lucide-react';
 
 export function PWARegistration() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -11,7 +9,24 @@ export function PWARegistration() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check if already installed
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .then((registration) => {
+          console.log('[PWA] Service worker registered:', registration.scope);
+
+          // Check for updates periodically (every 30 minutes)
+          setInterval(() => {
+            registration.update();
+          }, 30 * 60 * 1000);
+        })
+        .catch((error) => {
+          console.warn('[PWA] Service worker registration failed:', error);
+        });
+    }
+
+    // Check if already installed as PWA
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (isStandalone) {
       setIsInstalled(true);
@@ -26,26 +41,18 @@ export function PWARegistration() {
     window.addEventListener('beforeinstallprompt', handler);
 
     // Listen for app installed
-    window.addEventListener('appinstalled', () => {
+    const installedHandler = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
-    });
+    };
+    window.addEventListener('appinstalled', installedHandler);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
     };
   }, []);
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
-  };
-
-  if (isInstalled) return null;
-
+  // This component only handles SW registration, no visible UI
   return null;
 }
