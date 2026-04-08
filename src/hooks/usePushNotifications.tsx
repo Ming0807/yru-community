@@ -88,11 +88,16 @@ export function usePushNotifications() {
       const subscribeOptions: PushSubscriptionOptionsInit = {
         userVisibleOnly: true,
       };
-      if (VAPID_PUBLIC_KEY) {
-        subscribeOptions.applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      if (!VAPID_PUBLIC_KEY) {
+        toast.error('ระบบแจ้งเตือนยังไม่ได้ตั้งค่า VAPID Key (ติดต่อผู้ดูแลระบบ)');
+        setLoading(false);
+        return;
       }
 
-      const subscription = await registration.pushManager.subscribe(subscribeOptions);
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
 
       // Save subscription to server
       const {
@@ -178,7 +183,7 @@ export function PushNotificationToggle() {
       ) : (
         <BellOff className="h-4 w-4" />
       )}
-      {isSubscribed ? 'เปิดการแจ้งเตือน' : 'ปิดการแจ้งเตือน'}
+      {isSubscribed ? 'ปิดการแจ้งเตือน' : 'เปิดการแจ้งเตือน'}
     </Button>
   );
 }
