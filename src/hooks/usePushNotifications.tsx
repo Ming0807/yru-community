@@ -42,13 +42,6 @@ export function usePushNotifications() {
       return;
     }
 
-    // Check if VAPID key is available — without it push won't work
-    if (!VAPID_PUBLIC_KEY) {
-      setIsSupported(false);
-      setLoading(false);
-      return;
-    }
-
     setIsSupported(true);
     checkSubscription();
   }, []);
@@ -57,8 +50,7 @@ export function usePushNotifications() {
     try {
       const registration = await waitForServiceWorker(5000);
       if (!registration) {
-        // Service worker not available or timed out
-        setIsSupported(false);
+        // Service worker not available or timed out — still show the button
         setIsSubscribed(false);
         setLoading(false);
         return;
@@ -92,10 +84,15 @@ export function usePushNotifications() {
         return;
       }
 
-      const subscription = await registration.pushManager.subscribe({
+      // If no VAPID key, subscribe without applicationServerKey (browser default)
+      const subscribeOptions: PushSubscriptionOptionsInit = {
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+      };
+      if (VAPID_PUBLIC_KEY) {
+        subscribeOptions.applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      }
+
+      const subscription = await registration.pushManager.subscribe(subscribeOptions);
 
       // Save subscription to server
       const {
