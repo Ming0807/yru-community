@@ -112,9 +112,24 @@ export default async function PostPage({ params }: PostPageProps) {
     .eq('id', id)
     .then();
 
-  // Check if user voted/bookmarked
+  // Check if user voted/bookmarked/reacted (run in parallel for performance)
   let hasVoted = false;
   let hasBookmarked = false;
+  let initialReactionCounts: { type: string; count: number }[] = [];
+
+  // Always fetch reaction counts (server-side = instant, no client loading state)
+  const { data: reactionRows } = await supabase
+    .from('post_reactions')
+    .select('reaction_type')
+    .eq('post_id', id);
+
+  if (reactionRows) {
+    const aggregated = reactionRows.reduce((acc: Record<string, number>, curr: any) => {
+      acc[curr.reaction_type] = (acc[curr.reaction_type] || 0) + 1;
+      return acc;
+    }, {});
+    initialReactionCounts = Object.entries(aggregated).map(([type, count]) => ({ type, count }));
+  }
 
   if (authUser) {
     const [voteResult, bookmarkResult] = await Promise.all([
@@ -306,7 +321,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            <ReactionButton postId={post.id} userId={authUser?.id} />
+            <ReactionButton postId={post.id} userId={authUser?.id} initialCounts={initialReactionCounts} />
             <VoteButton
               postId={post.id}
               initialVoteCount={post.vote_count}
