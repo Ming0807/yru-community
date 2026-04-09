@@ -106,7 +106,10 @@ export default function Header() {
 
           {/* User Menu */}
           {loading ? (
-            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+            // Invisible spacer — preserves layout width without the distracting flash
+            // of skeleton→login→profile. The cache in UserProvider means this state
+            // is now extremely brief (typically < 50ms on revisits).
+            <div className="h-9 w-9 rounded-full opacity-0 pointer-events-none" />
           ) : user ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <Link href="/messages">

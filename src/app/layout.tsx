@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Inter, Noto_Sans_Thai } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { UserProvider } from "@/components/UserProvider";
-import { PWARegistration } from "@/components/PWARegistration";
 import "./globals.css";
 
 const inter = Inter({
@@ -66,10 +64,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <UserProvider>
-            {children}
-            <PWARegistration />
-          </UserProvider>
+          {children}
           <Toaster position="top-center" richColors />
         </ThemeProvider>
       </body>

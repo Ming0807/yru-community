@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import Header from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -64,9 +63,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     .eq('follower_id', id);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-
+    <div>
       <main className="mx-auto max-w-4xl px-4 py-6 pb-24">
         {/* Back button */}
         <Link href="/admin/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
