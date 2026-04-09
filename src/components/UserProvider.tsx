@@ -114,29 +114,53 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        // Always unblock loading — prevents infinite spinner
-        setLoading(false);
+        // INITIAL_SESSION fires on first mount and is handled entirely
+        // by fetchProfile() above. We must NOT call setLoading(false) here
+        // because fetchProfile() may still be mid-fetch, and unblocking
+        // early would flash the login button while user === null.
+        if (event === 'INITIAL_SESSION') return;
 
         if (event === 'SIGNED_OUT' || !session?.user) {
           setUser(null);
+          setLoading(false);
           clearProfileCache();
           return;
         }
 
-        // INITIAL_SESSION fires on first mount. Skip if we already resolved
-        // via fetchProfile() to avoid a redundant DB query.
-        if (event === 'INITIAL_SESSION') return;
+        if (event === 'SIGNED_IN') {
+          // After login redirect: check cache first for instant display,
+          // THEN fetch fresh profile, and only unblock loading after we
+          // have the user data — this eliminates the login button flash.
+          const cached = getCachedProfile(session.user.id);
+          if (cached) {
+            setUser(cached);
+            setLoading(false);
+          }
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (profile) {
+            setUser(profile);
+            setCachedProfile(profile);
+          }
+          setLoading(false);
+          return;
+        }
 
-        // TOKEN_REFRESHED or SIGNED_IN → fetch the latest profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profile) {
-          setUser(profile);
-          setCachedProfile(profile);
+        if (event === 'TOKEN_REFRESHED') {
+          // Silent background token refresh — update profile without
+          // touching the loading state (UI should already be stable).
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (profile) {
+            setUser(profile);
+            setCachedProfile(profile);
+          }
         }
       }
     );
