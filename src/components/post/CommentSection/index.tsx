@@ -88,6 +88,18 @@ export default function CommentSection({
     }
     if (!content.trim()) return;
 
+    // ตรวจสอบว่ากระทู้ถูกล็อกหรือไม่
+    const { data: post } = await supabase
+      .from('posts')
+      .select('is_locked')
+      .eq('id', postId)
+      .single();
+    
+    if (post?.is_locked) {
+      toast.error('กระทู้นี้ถูกล็อกแล้ว ไม่สามารถตอบกลับได้');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const parentId = getInsertParentId();

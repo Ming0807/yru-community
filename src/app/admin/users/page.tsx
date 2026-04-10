@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import AdminUsersClient from '@/components/admin/AdminUsersClient';
+import { AdminUsersTable } from '@/components/admin/tables/AdminUsersTable';
 
 export const metadata = { title: 'จัดการผู้ใช้ - Admin | YRU Community' };
 
@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
     .select('*', { count: 'exact', head: true });
 
   return (
-    <AdminUsersClient
+    <AdminUsersTable
       initialUsers={(data as any[]) ?? []}
       totalCount={count ?? 0}
     />

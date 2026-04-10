@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import AdminReportsClient from '@/components/admin/AdminReportsClient';
+import { AdminReportsTable } from '@/components/admin/tables/AdminReportsTable';
 
 export const metadata = { title: 'จัดการรายงาน - Admin | YRU Community' };
 
@@ -8,12 +8,7 @@ export default async function AdminReportsPage() {
 
   const { data, error } = await supabase
     .from('reports')
-    .select(`
-      *,
-      reporter:profiles!reporter_id(display_name),
-      post:posts(title),
-      comment:comments(content)
-    `)
+    .select('id, post_id, reason, status, created_at, post:posts(title)')
     .order('created_at', { ascending: false })
     .range(0, 99);
 
@@ -22,6 +17,6 @@ export default async function AdminReportsPage() {
   }
 
   return (
-    <AdminReportsClient initialReports={(data as any[]) ?? []} />
+    <AdminReportsTable initialReports={(data as any[]) ?? []} />
   );
 }
