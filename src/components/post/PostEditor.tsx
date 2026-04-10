@@ -152,6 +152,8 @@ const extensions = [
     orderedList: { keepMarks: true },
     heading: { levels: [1, 2, 3] },
     codeBlock: false,
+    link: false,
+    underline: false,
   }),
   Placeholder.configure({
     placeholder: 'เขียนเนื้อหากระทู้ของคุณที่นี่...',

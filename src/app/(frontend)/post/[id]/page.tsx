@@ -169,7 +169,10 @@ export default async function PostPage({ params }: PostPageProps) {
   }
 
   const editorExtensions = [
-    StarterKit,
+    StarterKit.configure({
+      link: false,
+      underline: false,
+    }),
     TipTapLink.configure({
       HTMLAttributes: {
         class: 'text-(--color-yru-pink) underline cursor-pointer',
