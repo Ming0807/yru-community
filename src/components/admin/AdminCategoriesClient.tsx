@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -159,6 +160,9 @@ export default function AdminCategoriesClient({ initialCategories }: Props) {
           <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
               <DialogTitle>{editingId ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่'}</DialogTitle>
+              <DialogDescription>
+                {editingId ? 'แก้ไขชื่อและไอคอนของหมวดหมู่' : 'สร้างหมวดหมู่ใหม่สำหรับกระทู้'}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-[1fr_80px] gap-3">

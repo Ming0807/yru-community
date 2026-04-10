@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -253,6 +254,9 @@ export default function AdminAdsClient({ initialAds }: Props) {
             <DialogContent className="sm:max-w-[750px]">
               <DialogHeader>
                 <DialogTitle>{editingId ? 'แก้ไขโฆษณา' : 'สร้างโฆษณาใหม่'}</DialogTitle>
+                <DialogDescription>
+                  {editingId ? 'แก้ไขรายละเอียดโฆษณา' : 'สร้างแคมเปญโฆษณาใหม่'}
+                </DialogDescription>
               </DialogHeader>
               <div className="grid md:grid-cols-2 gap-6 py-4">
                 {/* Left Column */}
