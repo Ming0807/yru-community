@@ -3,10 +3,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { createColumnHelper } from '@tanstack/react-table';
+import * as XLSX from 'xlsx';
 import { AdminDataTable } from '../AdminDataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Report {
@@ -141,6 +142,20 @@ export function AdminReportsTable({ initialReports }: AdminReportsTableProps) {
 
   const pendingCount = reports.filter(r => r.status === 'pending').length;
 
+  const handleExport = useCallback(() => {
+    const rows = filteredReports.map(r => ({
+      'กระทู้': r.post_title,
+      'เหตุผล': r.reason,
+      'สถานะ': r.status === 'pending' ? 'รอดำเนินการ' : r.status === 'resolved' ? 'แก้ไขแล้ว' : 'ปัดทิ้ง',
+      'วันที่': new Date(r.created_at).toLocaleDateString('th-TH'),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reports');
+    XLSX.writeFile(wb, `reports_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }, [filteredReports]);
+
   return (
     <div className="space-y-4">
       {pendingCount > 0 && (
@@ -151,6 +166,12 @@ export function AdminReportsTable({ initialReports }: AdminReportsTableProps) {
         </div>
       )}
       
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={handleExport} className="rounded-xl gap-2">
+          <Download className="h-4 w-4" /> Export Excel
+        </Button>
+      </div>
+
       <AdminDataTable
         data={filteredReports}
         columns={columns}

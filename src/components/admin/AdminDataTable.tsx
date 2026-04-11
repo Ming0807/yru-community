@@ -188,10 +188,17 @@ export function AdminDataTable<T>({
                   <tr
                     key={row.id}
                     className={cn(
-                      'border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer',
-                      row.getIsSelected() && 'bg-[var(--color-yru-pink)]/5'
+                      'border-b border-border/50 hover:bg-muted/20 transition-colors',
+                      row.getIsSelected() && 'bg-[var(--color-yru-pink)]/5',
+                      onRowClick && 'cursor-pointer'
                     )}
-                    onClick={() => onRowClick?.(row.original as T)}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      const isClickable = target.closest('a, button, input[type="checkbox"], input[type="radio"]');
+                      if (!isClickable && onRowClick) {
+                        onRowClick(row.original as T);
+                      }
+                    }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3">

@@ -2,18 +2,22 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
+import * as XLSX from 'xlsx';
 import { AdminDataTable } from '../AdminDataTable';
+import { BulkActionsBar } from '../BulkActionsBar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Search, Download, Shield, Ban, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Search, Download, Shield, Ban, CheckCircle, AlertTriangle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 
@@ -49,10 +53,87 @@ function getRoleBadge(role: Profile['role']) {
 }
 
 export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTableProps) {
-  const [users, setUsers] = useState<Profile[]>(initialUsers);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const supabase = useMemo(() => import('@/lib/supabase/client').then(m => m.createClient()), []);
+
+  const supabase = useMemo(() => createClient(), []);
+
+  const { data: users = initialUsers, isLoading } = useQuery({
+    queryKey: ['admin', 'users', 'list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(0, 99);
+      if (error) throw error;
+      return data as Profile[];
+    },
+    placeholderData: (prev) => prev ?? initialUsers,
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<Profile> }) => {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, updates }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onMutate: async ({ userId, updates }) => {
+      await queryClient.cancelQueries({ queryKey: ['admin', 'users'] });
+      const prev = queryClient.getQueryData(['admin', 'users', 'list']);
+      queryClient.setQueryData<Profile[]>(['admin', 'users', 'list'], (old) =>
+        old?.map((u) => (u.id === userId ? { ...u, ...updates } : u))
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(['admin', 'users', 'list'], context?.prev);
+      toast.error('ไม่สามารถอัปเดตได้');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      toast.success('อัปเดตสำเร็จ');
+    },
+  });
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ ids, updates }: { ids: string[]; updates: Partial<Profile> }) => {
+      const results = await Promise.allSettled(
+        ids.map(async (userId) => {
+          const res = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, updates }),
+          });
+          if (!res.ok) throw new Error(`Failed ${userId}`);
+          return res.json();
+        })
+      );
+      const failed = results.filter(r => r.status === 'rejected').length;
+      if (failed > 0) throw new Error(`${failed} รายการไม่สำเร็จ`);
+    },
+    onMutate: async ({ ids, updates }) => {
+      await queryClient.cancelQueries({ queryKey: ['admin', 'users'] });
+      const prev = queryClient.getQueryData(['admin', 'users', 'list']);
+      queryClient.setQueryData<Profile[]>(['admin', 'users', 'list'], (old) =>
+        old?.map((u) => (ids.includes(u.id) ? { ...u, ...updates } : u))
+      );
+      setSelectedIds(new Set());
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(['admin', 'users', 'list'], context?.prev);
+      toast.error('อัปเดตไม่สำเร็จ');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery) return users;
@@ -62,23 +143,6 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
       u.email?.toLowerCase().includes(q)
     );
   }, [users, searchQuery]);
-
-  const updateUser = useCallback(async (userId: string, updates: Partial<Profile>) => {
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, updates }),
-      });
-
-      if (!res.ok) throw new Error('Failed');
-      
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
-      toast.success('อัปเดตสำเร็จ');
-    } catch {
-      toast.error('เกิดข้อผิดพลาด');
-    }
-  }, []);
 
   const columns = useMemo(() => [
     columnHelper.display({
@@ -103,11 +167,8 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
           checked={selectedIds.has(row.original.id)}
           onChange={() => {
             const newSet = new Set(selectedIds);
-            if (newSet.has(row.original.id)) {
-              newSet.delete(row.original.id);
-            } else {
-              newSet.add(row.original.id);
-            }
+            if (newSet.has(row.original.id)) newSet.delete(row.original.id);
+            else newSet.add(row.original.id);
             setSelectedIds(newSet);
           }}
           onClick={(e) => e.stopPropagation()}
@@ -139,15 +200,12 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
     }),
     columnHelper.accessor('faculty', {
       header: 'คณะ / สาขา',
-      cell: ({ row }) => {
-        const user = row.original;
-        return (
-          <div>
-            <p className="font-medium">{user.faculty || '-'}</p>
-            <p className="text-xs text-muted-foreground">{user.major || '-'}</p>
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium">{row.original.faculty || '-'}</p>
+          <p className="text-xs text-muted-foreground">{row.original.major || '-'}</p>
+        </div>
+      ),
     }),
     columnHelper.accessor('status', {
       header: 'สถานะ',
@@ -177,24 +235,24 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
                 </Link>
               </DropdownMenuItem>
               {user.role !== 'admin' ? (
-                <DropdownMenuItem onClick={() => updateUser(user.id, { role: 'admin' })}>
+                <DropdownMenuItem onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { role: 'admin' } })}>
                   <Shield className="h-4 w-4 mr-2" />ตั้งแอดมิน
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={() => updateUser(user.id, { role: 'user' })}>
+                <DropdownMenuItem onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { role: 'user' } })}>
                   <Shield className="h-4 w-4 mr-2" />ถอดแอดมิน
                 </DropdownMenuItem>
               )}
               {user.status === 'active' ? (
-                <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'suspended' })}>
+                <DropdownMenuItem onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { status: 'suspended' } })}>
                   <AlertTriangle className="h-4 w-4 mr-2" />ระงับชั่วคราว
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'active' })}>
+                <DropdownMenuItem onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { status: 'active' } })}>
                   <CheckCircle className="h-4 w-4 mr-2" />ยกเลิกระงับ
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => updateUser(user.id, { status: 'banned' })} className="text-red-600">
+              <DropdownMenuItem onClick={() => updateUserMutation.mutate({ userId: user.id, updates: { status: 'banned' } })} className="text-red-600">
                 <Ban className="h-4 w-4 mr-2" />แบนถาวร
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -202,28 +260,104 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
         );
       },
     }),
-  ], [updateUser]);
+  ], [selectedIds, filteredUsers.length, updateUserMutation]);
 
-  const handleExport = useCallback(() => {
-    const headers = ['ชื่อ', 'อีเมล', 'คณะ', 'สาขา', 'สถานะ', 'บทบาท'];
-    const rows = filteredUsers.map(u => [u.display_name, u.email, u.faculty, u.major, u.status, u.role]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [filteredUsers]);
+  const handleExport = useCallback((onlySelected: boolean = false, format: 'xlsx' | 'csv' = 'xlsx') => {
+    const dataToExport = onlySelected && selectedIds.size > 0
+      ? users.filter(u => selectedIds.has(u.id))
+      : filteredUsers;
+    
+    const rows = dataToExport.map(u => ({
+      'ชื่อ': u.display_name ?? '',
+      'อีเมล': u.email ?? '',
+      'คณะ': u.faculty ?? '',
+      'สาขา': u.major ?? '',
+      'สถานะ': u.status === 'active' ? 'ใช้งาน' : u.status === 'suspended' ? 'ระงับ' : u.status === 'banned' ? 'แบน' : u.status,
+      'บทบาท': u.role === 'admin' ? 'แอดมิน' : u.role === 'moderator' ? 'ม็อด' : 'สมาชิก',
+    }));
+
+    if (format === 'xlsx') {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+      XLSX.writeFile(wb, `users_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } else {
+      const headers = ['ชื่อ', 'อีเมล', 'คณะ', 'สาขา', 'สถานะ', 'บทบาท'];
+      const csvRows = dataToExport.map(u => [u.display_name, u.email, u.faculty, u.major, u.status, u.role]);
+      const csv = [headers, ...csvRows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, [filteredUsers, users, selectedIds]);
+
+  const bulkActions = [
+    {
+      id: 'suspend',
+      label: 'ระงับ',
+      icon: AlertTriangle,
+      variant: 'warning' as const,
+      onClick: (ids: string[]) => bulkUpdateMutation.mutate({ ids, updates: { status: 'suspended' } }),
+      confirmMessage: 'ระงับผู้ใช้ที่เลือก',
+    },
+    {
+      id: 'ban',
+      label: 'แบน',
+      icon: Ban,
+      variant: 'destructive' as const,
+      onClick: (ids: string[]) => bulkUpdateMutation.mutate({ ids, updates: { status: 'banned' } }),
+      confirmMessage: 'แบนผู้ใช้ที่เลือก',
+    },
+    {
+      id: 'activate',
+      label: 'เปิดใช้',
+      icon: CheckCircle,
+      onClick: (ids: string[]) => bulkUpdateMutation.mutate({ ids, updates: { status: 'active' } }),
+    },
+  ];
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
         <p className="text-sm text-muted-foreground">{totalCount} ผู้ใช้งาน</p>
-        <Button variant="outline" size="sm" onClick={handleExport} className="rounded-xl gap-2 self-end">
-          <Download className="h-4 w-4" /> Export CSV
-        </Button>
+        <div className="flex gap-2 self-end">
+          {selectedIds.size > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-xl gap-2">
+                  <Download className="h-4 w-4" /> Export ที่เลือก ({selectedIds.size})
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleExport(true, 'xlsx')}>
+                  Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport(true, 'csv')}>
+                  CSV (.csv)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-xl gap-2">
+                <Download className="h-4 w-4" /> Export ทั้งหมด
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleExport(false, 'xlsx')}>
+                Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport(false, 'csv')}>
+                CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <AdminDataTable
@@ -239,6 +373,13 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
         onSelectionChange={setSelectedIds}
         onRowClick={(user) => window.location.href = `/admin/users/${user.id}`}
         emptyMessage="ไม่พบผู้ใช้"
+      />
+
+      <BulkActionsBar
+        selectedCount={selectedIds.size}
+        selectedIds={Array.from(selectedIds)}
+        onClear={() => setSelectedIds(new Set())}
+        actions={bulkActions}
       />
     </div>
   );

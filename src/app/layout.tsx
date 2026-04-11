@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Noto_Sans_Thai } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -58,15 +59,17 @@ export default function RootLayout({
   return (
     <html lang="th" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className={`${inter.variable} ${notoSansThai.variable} font-sans antialiased bg-background text-foreground selection:bg-[var(--color-yru-pink)]/20`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster position="top-center" richColors />
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster position="top-center" richColors />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );
