@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { sendPushToAllUsers, insertNotificationsForAllUsers } from '@/lib/web-push';
 
 export async function GET() {
   try {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     
     const { user } = auth as any;
     const body = await req.json();
-    const { title, content, target = 'all', target_value, scheduled_at } = body;
+    const { title, content, target = 'all', target_value, scheduled_at, send_notification = true } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
@@ -74,7 +75,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create announcement' }, { status: 500 });
     }
 
-    // TODO: Send push notifications to all users (Web Push)
+    if (send_notification) {
+      const inAppCount = await insertNotificationsForAllUsers(
+        title,
+        content.substring(0, 100),
+        '/announcements'
+      );
+      console.log(`[Announcements] Inserted ${inAppCount} in-app notifications`);
+
+      const pushResult = await sendPushToAllUsers(
+        title,
+        content.substring(0, 100),
+        { type: 'announcement', id: data.id }
+      );
+      console.log(`[Announcements] Push notifications: ${pushResult.sent} sent, ${pushResult.failed} failed`);
+    }
 
     return NextResponse.json(data);
   } catch (error) {

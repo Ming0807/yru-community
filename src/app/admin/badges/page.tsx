@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
@@ -97,6 +97,7 @@ export default function AdminBadgesPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>สร้างเหรียญตราใหม่</DialogTitle>
+              <DialogDescription>สร้างเหรียญตราใหม่สำหรับรางวัลของผู้ใช้</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>

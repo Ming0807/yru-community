@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, LayoutDashboard, Users, UserCog, Award, MessageSquare, MessageCircle, Tags, FolderTree, Flag, ClipboardList, ShieldAlert, Megaphone, Bell, Settings, Globe, ArrowLeft, ArrowRight, ChevronDown, BarChart3 } from 'lucide-react';
+import { Shield, LayoutDashboard, Users, UserCog, Award, MessageSquare, MessageCircle, Tags, FolderTree, Flag, ClipboardList, ShieldAlert, Megaphone, Bell, Settings, Globe, ArrowLeft, ArrowRight, ChevronDown, BarChart3, Menu } from 'lucide-react';
 import { AdminCommandPalette } from './AdminCommandPalette';
 import { AdminNotifications } from './AdminNotifications';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 type NavGroup = {
@@ -70,6 +71,7 @@ const navGroups: NavGroup[] = [
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     navGroups.forEach((group) => {
@@ -106,15 +108,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-muted/20 flex flex-col md:flex-row">
-      {/* Sidebar */}
+      {/* Sidebar - Fixed position */}
       <aside
         className={cn(
-          'hidden md:flex bg-background border-r border-border/50 flex-col min-h-screen sticky top-0 z-40 transition-all duration-300',
+          'hidden md:flex bg-background border-r border-border/50 flex-col fixed top-0 left-0 h-screen z-40 transition-all duration-300',
           collapsed ? 'w-20' : 'w-64'
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-4 border-b border-border/50">
+        <div className="h-16 flex items-center px-4 border-b border-border/50 flex-shrink-0">
           <Link href="/admin" className="flex items-center gap-2.5 font-bold text-lg text-foreground hover:opacity-80 transition-opacity">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 text-white shadow-sm shadow-red-500/20 flex-shrink-0">
               <Shield className="w-4.5 h-4.5" />
@@ -123,8 +125,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </Link>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        {/* Navigation - Scrollable */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-border/60 scrollbar-track-transparent hover:scrollbar-thumb-border">
           {navGroups.map((group) => {
             const Icon = group.icon;
             const isExpanded = expandedGroups.has(group.title);
@@ -219,8 +221,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      {/* Main Wrapper */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Wrapper - with margin for fixed sidebar */}
+      <div className={cn(
+        'flex-1 flex flex-col min-w-0 transition-all duration-300',
+        collapsed ? 'md:ml-20' : 'md:ml-64'
+      )}>
         {/* Header */}
         <header className="sticky top-0 z-50 h-16 bg-background/90 backdrop-blur-xl border-b border-border/50 flex items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Mobile Logo */}
@@ -262,27 +267,70 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden flex overflow-x-auto bg-background/95 backdrop-blur-md border-b border-border/50 px-4 py-3 gap-2 text-sm sticky top-16 z-40 scrollbar-none">
-          {navGroups.flatMap((group) =>
-            group.items.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`px-4 py-2 rounded-full whitespace-nowrap transition-all duration-200 border ${
-                    active
-                      ? 'bg-[var(--color-yru-pink)]/10 text-[var(--color-yru-pink)] border-[var(--color-yru-pink)]/20 font-semibold shadow-sm'
-                      : 'bg-muted/30 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {item.name}
-                </Link>
-              );
-            })
-          )}
+        {/* Mobile Navigation - Header with Hamburger */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-background/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-40">
+          <div className="flex items-center gap-2 font-bold text-lg">
+            <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-br from-red-500 to-red-600 text-white">
+              <Shield className="w-4 h-4" />
+            </div>
+            <span>Admin</span>
+          </div>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
         </div>
+
+        {/* Mobile Menu Dialog */}
+        <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>เมนูแอดมิน</DialogTitle>
+              <DialogDescription>เลือกหมวดหมู่เมนูที่ต้องการ</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto py-2">
+              {navGroups.map((group) => {
+                const Icon = group.icon;
+                const isExpanded = expandedGroups.has(group.title);
+                
+                return (
+                  <div key={group.title} className="space-y-1">
+                    <button
+                      onClick={() => toggleGroup(group.title)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+                    >
+                      <Icon className="w-5 h-5 text-[var(--color-yru-pink)]" />
+                      <span className="flex-1 font-medium">{group.title}</span>
+                      <ChevronDown className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="pl-9 space-y-1">
+                        {group.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                              'block px-3 py-2 rounded-lg text-sm transition-colors',
+                              isActive(item.href)
+                                ? 'bg-[var(--color-yru-pink)]/10 text-[var(--color-yru-pink)] font-medium'
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            )}
+                          >
+                            {item.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
