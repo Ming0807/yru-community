@@ -27,13 +27,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    const { error: deleteError } = await supabase
+    const { error: updateError } = await supabase
       .from('comments')
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', commentId);
 
-    if (deleteError) {
-      console.error('[AdminComments] Delete error:', deleteError);
+    if (updateError) {
+      console.error('[AdminComments] Delete error:', updateError);
       return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
     }
 

@@ -21,17 +21,17 @@ export default async function AdminCommentsPage() {
 
   const { data: comments } = await supabase
     .from('comments')
-    .select('id, content, created_at, post_id, user_id, post:posts(title), user:profiles(display_name, avatar_url)')
+    .select('id, content, created_at, post_id, author_id, post:posts(title), user:profiles(display_name, avatar_url)')
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
 
-  const formattedComments = (comments ?? []).map((c: any) => ({
+  const formattedComments = ((comments ?? []) as any[]).map((c) => ({
     id: c.id,
     content: c.content,
     created_at: c.created_at,
     post_id: c.post_id,
-    user_id: c.user_id,
     post_title: c.post?.title,
+    author_id: c.author_id,
     user: c.user,
   }));
 
