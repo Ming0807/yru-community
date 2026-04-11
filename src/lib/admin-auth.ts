@@ -4,11 +4,9 @@ import { NextResponse } from 'next/server';
 export async function requireAdmin() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
@@ -22,17 +20,15 @@ export async function requireAdmin() {
     return { error: NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 }) };
   }
 
-  return { user, profile };
+  return { supabase, user, profile };
 }
 
 export async function requireModerator() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
@@ -46,7 +42,7 @@ export async function requireModerator() {
     return { error: NextResponse.json({ error: 'Forbidden: Moderator access required' }, { status: 403 }) };
   }
 
-  return { user, profile };
+  return { supabase, user, profile };
 }
 
 export function canAccessAdmin(role?: string) {

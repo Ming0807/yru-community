@@ -85,11 +85,9 @@ export function AuditLogTable({ initialLogs }: AuditLogTableProps) {
   const { data: logs = initialLogs } = useQuery({
     queryKey: ['admin', 'audit', 'list'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('audit_logs')
-        .select('*, admin:profiles!admin_id(display_name, avatar_url)')
-        .order('created_at', { ascending: false })
-        .range(0, 99);
+      const res = await fetch('/api/admin/audit');
+      if (!res.ok) throw new Error('Failed to fetch audit logs');
+      const data = await res.json();
       return (data ?? []) as AuditLog[];
     },
     placeholderData: (prev) => prev ?? initialLogs,

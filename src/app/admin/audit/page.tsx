@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Shield, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AuditLogTable } from '@/components/admin/tables/AuditLogTable';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 interface AuditLog {
   id: string;
@@ -32,11 +33,18 @@ export default async function AuditLogPage() {
 
   if (profile?.role !== 'admin') redirect('/');
 
-  const { data: logs } = await supabase
-    .from('audit_logs')
-    .select('*, admin:profiles!admin_id(display_name, avatar_url)')
-    .order('created_at', { ascending: false })
-    .limit(100);
+  let logs: any[] | null = null;
+  try {
+    const adminSupabase = getAdminClient();
+    const { data } = await adminSupabase
+      .from('audit_logs')
+      .select('*, admin:profiles!admin_id(display_name, avatar_url)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    logs = data;
+  } catch (err) {
+    console.error('Failed to fetch initial audit logs with admin client:', err);
+  }
 
   const auditLogs = (logs ?? []) as AuditLog[];
 

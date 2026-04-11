@@ -11,24 +11,24 @@ export async function GET() {
     try {
       supabase = getAdminClient();
     } catch (e: any) {
-      console.error('[WordFilter] Admin client error:', e);
+      console.error('[Announcements] Admin client error:', e);
       return NextResponse.json({ error: 'Server configuration error (Service Role Key missing)' }, { status: 500 });
     }
     
     const { data, error } = await supabase
-      .from('word_filters')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .from('announcements')
+      .select('*, created_by_user:profiles(display_name, avatar_url)')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) {
-      console.error('[WordFilter] Fetch error:', error);
+      console.error('[Announcements] Fetch error:', error);
       return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
     }
 
     return NextResponse.json(data ?? []);
   } catch (error) {
-    console.error('[WordFilter] Error:', error);
+    console.error('[Announcements] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
@@ -42,40 +42,43 @@ export async function POST(req: NextRequest) {
     try {
       supabase = getAdminClient();
     } catch (e: any) {
-      console.error('[WordFilter] Admin client error:', e);
+      console.error('[Announcements] Admin client error:', e);
       return NextResponse.json({ error: 'Server configuration error (Service Role Key missing)' }, { status: 500 });
     }
     
     const { user } = auth as any;
     const body = await req.json();
-    const { word, severity = 'medium', action = 'warn' } = body;
+    const { title, content, target = 'all', target_value, scheduled_at } = body;
 
-    if (!word || typeof word !== 'string') {
-      return NextResponse.json({ error: 'Word is required' }, { status: 400 });
+    if (!title || !content) {
+      return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
     }
 
     const { data, error } = await supabase
-      .from('word_filters')
+      .from('announcements')
       .insert({
-        word: word.trim(),
-        severity,
-        action,
+        title,
+        content,
+        target,
+        target_value,
+        scheduled_at,
         created_by: user?.id,
+        is_sent: true, 
+        sent_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json({ error: 'คำนี้มีอยู่แล้ว' }, { status: 400 });
-      }
-      console.error('[WordFilter] Insert error:', error);
-      return NextResponse.json({ error: 'Failed to add word' }, { status: 500 });
+      console.error('[Announcements] Insert error:', error);
+      return NextResponse.json({ error: 'Failed to create announcement' }, { status: 500 });
     }
+
+    // TODO: Send push notifications to all users (Web Push)
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('[WordFilter] Error:', error);
+    console.error('[Announcements] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
@@ -89,30 +92,30 @@ export async function DELETE(req: NextRequest) {
     try {
       supabase = getAdminClient();
     } catch (e: any) {
-      console.error('[WordFilter] Admin client error:', e);
+      console.error('[Announcements] Admin client error:', e);
       return NextResponse.json({ error: 'Server configuration error (Service Role Key missing)' }, { status: 500 });
     }
-    
-    const { searchParams } = new URL(req.url);
-    const wordId = searchParams.get('id');
 
-    if (!wordId) {
-      return NextResponse.json({ error: 'Word ID required' }, { status: 400 });
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID required' }, { status: 400 });
     }
 
     const { error } = await supabase
-      .from('word_filters')
-      .update({ is_active: false })
-      .eq('id', wordId);
+      .from('announcements')
+      .delete()
+      .eq('id', id);
 
     if (error) {
-      console.error('[WordFilter] Delete error:', error);
+      console.error('[Announcements] Delete error:', error);
       return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[WordFilter] Error:', error);
+    console.error('[Announcements] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

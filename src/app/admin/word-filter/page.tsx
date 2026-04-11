@@ -29,11 +29,9 @@ export default function AdminWordFilterPage() {
   const { data: words = [], isLoading } = useQuery({
     queryKey: ['admin', 'word-filters'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('word_filters')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      const res = await fetch('/api/admin/word-filter');
+      if (!res.ok) throw new Error('Failed to fetch word filters');
+      const data = await res.json();
       return (data ?? []) as WordFilter[];
     },
   });
