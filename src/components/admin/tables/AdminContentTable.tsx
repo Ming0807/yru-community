@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
 import * as XLSX from 'xlsx';
 import { AdminDataTable } from '../AdminDataTable';
@@ -15,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface Post {
@@ -30,35 +30,61 @@ interface Post {
 
 interface AdminContentTableProps {
   initialPosts: Post[];
+  totalCount: number;
+  currentPage?: number;
+  pageSize?: number;
+  searchQuery?: string;
 }
 
 const columnHelper = createColumnHelper<Post>();
 
-export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
-  const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
+export function AdminContentTable({
+  initialPosts,
+  totalCount,
+  currentPage = 1,
+  pageSize = 50,
+  searchQuery = '',
+}: AdminContentTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [localSearch, setLocalSearch] = useState(searchQuery);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const supabase = useMemo(() => createClient(), []);
 
-  const { data: livePosts } = useQuery({
-    queryKey: ['admin', 'posts', 'list'],
+  const { data: postsData, refetch } = useQuery({
+    queryKey: ['admin', 'posts', 'list', currentPage, pageSize, searchQuery],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('posts')
-        .select('id, title, is_pinned, is_locked, deleted_at, created_at, category_id, category:categories(name)')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .range(0, 99);
-      return data as Post[] || [];
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+        ...(searchQuery ? { search: searchQuery } : {}),
+      });
+      const res = await fetch(`/api/admin/posts?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const result = await res.json();
+      return result as { posts: Post[]; total: number; page: number; totalPages: number };
     },
-    placeholderData: (prev) => prev ?? initialPosts,
+    initialData: {
+      posts: initialPosts,
+      total: totalCount,
+      page: currentPage,
+      totalPages: Math.ceil(totalCount / pageSize),
+    },
+    placeholderData: (prev) => prev,
   });
 
-  const filteredPosts = useMemo(() => {
-    if (!searchQuery) return livePosts ?? [];
-    const q = searchQuery.toLowerCase();
-    return (livePosts ?? []).filter(p => p.title.toLowerCase().includes(q));
-  }, [livePosts, searchQuery]);
+  const posts = postsData?.posts ?? [];
+
+  const handleSearch = useCallback((query: string) => {
+    setLocalSearch(query);
+    const params = new URLSearchParams(searchParams.toString());
+    if (query) {
+      params.set('search', query);
+    } else {
+      params.delete('search');
+    }
+    params.set('page', '1');
+    router.push(`/admin/content?${params.toString()}`);
+  }, [router, searchParams]);
 
   const updatePostMutation = useMutation({
     mutationFn: async ({ postId, updates }: { postId: string; updates: Record<string, unknown> }) => {
@@ -70,19 +96,12 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       if (!res.ok) throw new Error('Failed');
       return res.json();
     },
-    onMutate: async ({ postId, updates }) => {
-      await queryClient.cancelQueries({ queryKey: ['admin', 'posts'] });
-      queryClient.setQueryData<Post[]>(['admin', 'posts', 'list'], (old) =>
-        old?.map((p) => (p.id === postId ? { ...p, ...updates } : p))
-      );
+    onSuccess: () => {
+      toast.success('อัปเดตสำเร็จ');
+      refetch();
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'posts'] });
       toast.error('ไม่สามารถอัปเดตได้');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'posts'] });
-      toast.success('อัปเดตสำเร็จ');
     },
   });
 
@@ -91,21 +110,12 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       const res = await fetch(`/api/admin/posts?id=${postId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed');
     },
-    onMutate: async (postId) => {
-      await queryClient.cancelQueries({ queryKey: ['admin', 'posts'] });
-      const prev = queryClient.getQueryData(['admin', 'posts', 'list']);
-      queryClient.setQueryData<Post[]>(['admin', 'posts', 'list'], (old) =>
-        old?.filter((p) => p.id !== postId)
-      );
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['admin', 'posts', 'list'], context?.prev);
-      toast.error('ไม่สามารถลบได้');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'posts'] });
+    onSuccess: () => {
       toast.success('ลบสำเร็จ');
+      refetch();
+    },
+    onError: () => {
+      toast.error('ไม่สามารถลบได้');
     },
   });
 
@@ -113,22 +123,13 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
     mutationFn: async (ids: string[]) => {
       await Promise.all(ids.map(id => fetch(`/api/admin/posts?id=${id}`, { method: 'DELETE' })));
     },
-    onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ['admin', 'posts'] });
-      const prev = queryClient.getQueryData(['admin', 'posts', 'list']);
-      queryClient.setQueryData<Post[]>(['admin', 'posts', 'list'], (old) =>
-        old?.filter((p) => !ids.includes(p.id))
-      );
-      setSelectedIds(new Set());
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['admin', 'posts', 'list'], context?.prev);
-      toast.error('ไม่สามารถลบได้');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'posts'] });
+    onSuccess: () => {
       toast.success('ลบสำเร็จ');
+      setSelectedIds(new Set());
+      refetch();
+    },
+    onError: () => {
+      toast.error('ไม่สามารถลบได้');
     },
   });
 
@@ -152,8 +153,8 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       header: () => (
         <input
           type="checkbox"
-          checked={selectedIds.size === filteredPosts.length && filteredPosts.length > 0}
-          onChange={() => setSelectedIds(prev => prev.size === filteredPosts.length ? new Set() : new Set(filteredPosts.map(p => p.id)))}
+          checked={selectedIds.size === posts.length && posts.length > 0}
+          onChange={() => setSelectedIds(prev => prev.size === posts.length ? new Set() : new Set(posts.map(p => p.id)))}
           className="w-4 h-4 rounded cursor-pointer"
         />
       ),
@@ -197,26 +198,26 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       cell: ({ row }) => {
         const post = row.original;
         return (
-<div className="flex items-center gap-0.5">
-          <Link href={`/post/${post.id}`}>
-            <Button variant="ghost" size="icon-sm" className="rounded-lg" title="ดูกระทู้">
-              <Eye className="h-4 w-4" />
+          <div className="flex items-center gap-0.5">
+            <Link href={`/post/${post.id}`}>
+              <Button variant="ghost" size="icon-sm" className="rounded-lg" title="ดูกระทู้">
+                <Eye className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_pinned ? 'ถอดหมุด' : 'ปักหมุด'} onClick={() => handleTogglePin(post.id, post.is_pinned)}>
+              📌
             </Button>
-          </Link>
-          <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_pinned ? 'ถอดหมุด' : 'ปักหมุด'} onClick={() => handleTogglePin(post.id, post.is_pinned)}>
-            📌
-          </Button>
-          <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_locked ? 'ปลดล็อก' : 'ล็อกกระทู้'} onClick={() => handleToggleLock(post.id, post.is_locked || false)}>
-            {post.is_locked ? '🔓' : '🔒'}
-          </Button>
-          <Button variant="ghost" size="icon-sm" className="rounded-lg text-red-500 hover:text-red-600" title="ลบกระทู้" onClick={() => handleDelete(post.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+            <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_locked ? 'ปลดล็อก' : 'ล็อกกระทู้'} onClick={() => handleToggleLock(post.id, post.is_locked || false)}>
+              {post.is_locked ? '🔓' : '🔒'}
+            </Button>
+            <Button variant="ghost" size="icon-sm" className="rounded-lg text-red-500 hover:text-red-600" title="ลบกระทู้" onClick={() => handleDelete(post.id)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         );
       },
     }),
-  ], [selectedIds, filteredPosts.length, handleTogglePin, handleToggleLock, handleDelete]);
+  ], [selectedIds, posts.length, handleTogglePin, handleToggleLock, handleDelete]);
 
   const bulkActions = [
     {
@@ -251,8 +252,8 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
 
   const handleExport = useCallback((onlySelected: boolean = false, format: 'xlsx' | 'csv' = 'xlsx') => {
     const dataToExport = onlySelected && selectedIds.size > 0
-      ? livePosts?.filter(p => selectedIds.has(p.id)) ?? []
-      : filteredPosts;
+      ? posts.filter(p => selectedIds.has(p.id))
+      : posts;
 
     if (format === 'xlsx') {
       const rows = dataToExport.map(p => ({
@@ -284,12 +285,12 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       a.click();
       URL.revokeObjectURL(url);
     }
-  }, [filteredPosts, livePosts, selectedIds]);
+  }, [posts, selectedIds]);
 
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center mb-4">
-        <p className="text-sm text-muted-foreground">{livePosts?.length ?? 0} กระทู้</p>
+        <p className="text-sm text-muted-foreground">{postsData?.total ?? totalCount} กระทู้</p>
         <div className="flex gap-2 self-end">
           {selectedIds.size > 0 && (
             <DropdownMenu>
@@ -299,12 +300,8 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleExport(true, 'xlsx')}>
-                  Excel (.xlsx)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport(true, 'csv')}>
-                  CSV (.csv)
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport(true, 'xlsx')}>Excel (.xlsx)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport(true, 'csv')}>CSV (.csv)</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -315,32 +312,28 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExport(false, 'xlsx')}>
-                Excel (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport(false, 'csv')}>
-                CSV (.csv)
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport(false, 'xlsx')}>Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport(false, 'csv')}>CSV (.csv)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
       <AdminDataTable
-        data={filteredPosts}
+        data={posts}
         columns={columns}
         pageSize={15}
         searchable
         searchPlaceholder="ค้นหากระทู้..."
-        onSearchChange={setSearchQuery}
-        searchQuery={searchQuery}
+        onSearchChange={handleSearch}
+        searchQuery={localSearch}
         selectable
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         onRowClick={(post) => window.location.href = `/post/${post.id}`}
         emptyMessage="ไม่พบกระทู้"
       />
-      
+
       <BulkActionsBar
         selectedCount={selectedIds.size}
         selectedIds={Array.from(selectedIds)}

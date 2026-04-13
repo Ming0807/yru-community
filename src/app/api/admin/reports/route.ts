@@ -9,8 +9,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
     const status = searchParams.get('status');
     const countOnly = searchParams.get('count') === 'true';
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
     const supabase = await createClient();
 
@@ -26,18 +31,24 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('reports')
-      .select('*, reporter:profiles!reports_reporter_id_fkey(display_name, avatar_url), post:posts(id, title), comment:comments(id, content)')
+      .select('*, reporter:profiles!reports_reporter_id_fkey(display_name, avatar_url), post:posts(id, title), comment:comments(id, content)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range(from, to);
 
     if (status) {
       query = query.eq('status', status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw error;
 
-    return NextResponse.json(data ?? []);
+    return NextResponse.json({
+      reports: data ?? [],
+      total: count ?? 0,
+      page,
+      limit,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

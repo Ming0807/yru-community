@@ -1,7 +1,54 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { logAdminAction } from '@/lib/admin-audit';
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const search = searchParams.get('search') || '';
+    const category = searchParams.get('category') || '';
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const supabase = await createClient();
+
+    let query = supabase
+      .from('posts')
+      .select('id, title, is_pinned, is_locked, deleted_at, created_at, category_id, category:categories(name)', { count: 'exact' })
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (search) {
+      query = query.ilike('title', `%${search}%`);
+    }
+
+    if (category) {
+      query = query.eq('category_id', category);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return NextResponse.json({
+      posts: data ?? [],
+      total: count ?? 0,
+      page,
+      limit,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function DELETE(req: Request) {
   const auth = await requireAdmin();
