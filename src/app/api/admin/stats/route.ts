@@ -22,8 +22,10 @@ export async function GET() {
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending');
 
-  const encoder = new TextEncoder();
-  
+const encoder = new TextEncoder();
+
+  let interval: NodeJS.Timeout | null = null;
+
   const stream = new ReadableStream({
     start(controller) {
       const sendUpdate = async () => {
@@ -50,15 +52,13 @@ export async function GET() {
       };
 
       sendUpdate();
-
-      const interval = setInterval(sendUpdate, 30000);
-
-      const close = () => {
+      interval = setInterval(sendUpdate, 30000);
+    },
+    cancel() {
+      if (interval) {
         clearInterval(interval);
-        controller.close();
-      };
-
-      return () => clearInterval(interval);
+        interval = null;
+      }
     },
   });
 

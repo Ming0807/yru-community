@@ -2,11 +2,10 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Shield, Ban, CheckCircle, Clock, MessageSquare, BookOpen, Flag, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { timeAgo } from '@/lib/utils';
+import { AdminUserActions } from '@/components/admin/AdminUserActions';
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -70,73 +69,76 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <ArrowLeft className="h-4 w-4" /> กลับไปจัดการผู้ใช้
         </Link>
 
-        {/* Profile Card */}
-        <div className="rounded-2xl border bg-card p-6 shadow-sm mb-6">
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <Avatar className="h-20 w-20 ring-4 ring-background shadow-md">
-              <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
-              <AvatarFallback className="text-2xl bg-gradient-to-br from-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)]">
-                {profile.display_name?.charAt(0) ?? 'U'}
-              </AvatarFallback>
-            </Avatar>
+{/* Profile Card */}
+      <div className="rounded-2xl border bg-card p-6 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          <Avatar className="h-20 w-20 ring-4 ring-background shadow-md">
+            <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
+            <AvatarFallback className="text-2xl bg-gradient-to-br from-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)]">
+              {profile.display_name?.charAt(0) ?? 'U'}
+            </AvatarFallback>
+          </Avatar>
 
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{profile.display_name}</h1>
-                {profile.role === 'admin' && (
-                  <Badge className="bg-[var(--color-yru-pink)] text-white gap-1">
-                    <Shield className="h-3 w-3" /> แอดมิน
-                  </Badge>
-                )}
-                {profile.status === 'banned' && (
-                  <Badge variant="destructive" className="gap-1">
-                    <Ban className="h-3 w-3" /> แบนถาวร
-                  </Badge>
-                )}
-                {profile.status === 'suspended' && (
-                  <Badge variant="outline" className="border-orange-500 text-orange-500 gap-1">
-                    <Clock className="h-3 w-3" /> แบนชั่วคราว
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5" /> {profile.email}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 mt-1 text-sm">
-                <span className="font-medium text-foreground">{profile.faculty || 'ไม่ระบุคณะ'}</span>
-                {profile.major && <span className="text-muted-foreground">· {profile.major}</span>}
-              </div>
-
-              {profile.bio && (
-                <p className="mt-3 text-sm text-foreground/80 whitespace-pre-wrap line-clamp-2">
-                  {profile.bio}
-                </p>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{profile.display_name}</h1>
+              {profile.role === 'admin' && (
+                <Badge className="bg-[var(--color-yru-pink)] text-white gap-1">
+                  <Shield className="h-3 w-3" /> แอดมิน
+                </Badge>
               )}
+              {profile.status === 'banned' && (
+                <Badge variant="destructive" className="gap-1">
+                  <Ban className="h-3 w-3" /> แบนถาวร
+                </Badge>
+              )}
+              {profile.status === 'suspended' && (
+                <Badge variant="outline" className="border-orange-500 text-orange-500 gap-1">
+                  <Clock className="h-3 w-3" /> ระงับชั่วคราว
+                </Badge>
+              )}
+            </div>
 
-              <div className="flex items-center gap-6 mt-4">
-                <div className="text-sm">
-                  <span className="font-bold">{followersCount || 0}</span> <span className="text-muted-foreground">ผู้ติดตาม</span>
-                </div>
-                <div className="text-sm">
-                  <span className="font-bold">{followingCount || 0}</span> <span className="text-muted-foreground">กำลังติดตาม</span>
-                </div>
-                <div className="text-sm">
-                  <span className="font-bold">LV.{profile.level || 1}</span> <span className="text-muted-foreground">EXP: {profile.experience_points || 0}</span>
-                </div>
-              </div>
+            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" /> {profile.email}
+              </span>
+            </div>
 
-              <div className="text-xs text-muted-foreground mt-3">
-                เข้าร่วมเมื่อ {new Date(profile.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
+            <div className="flex items-center gap-2 mt-1 text-sm">
+              <span className="font-medium text-foreground">{profile.faculty || 'ไม่ระบุคณะ'}</span>
+              {profile.major && <span className="text-muted-foreground">· {profile.major}</span>}
+            </div>
+
+            {profile.bio && (
+              <p className="mt-3 text-sm text-foreground/80 whitespace-pre-wrap line-clamp-2">
+                {profile.bio}
+              </p>
+            )}
+
+            <div className="flex items-center gap-6 mt-4">
+              <div className="text-sm">
+                <span className="font-bold">{followersCount || 0}</span> <span className="text-muted-foreground">ผู้ติดตาม</span>
               </div>
+              <div className="text-sm">
+                <span className="font-bold">{followingCount || 0}</span> <span className="text-muted-foreground">กำลังติดตาม</span>
+              </div>
+              <div className="text-sm">
+                <span className="font-bold">LV.{profile.level || 1}</span> <span className="text-muted-foreground">EXP: {profile.experience_points || 0}</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground mt-3">
+              เข้าร่วมเมื่อ {new Date(profile.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Stats Cards */}
+{/* Admin Actions */}
+      <AdminUserActions user={profile} />
+
+      {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="rounded-xl border bg-card p-4 text-center">
             <BookOpen className="h-5 w-5 mx-auto mb-1 text-[var(--color-yru-pink)]" />

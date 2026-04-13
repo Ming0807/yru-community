@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { AdminDataTable } from '../AdminDataTable';
 import { BulkActionsBar } from '../BulkActionsBar';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit, Trash2, Pin, PinOff, Download } from 'lucide-react';
+import { Eye, Trash2, Pin, PinOff, Download } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ interface Post {
   created_at: string;
   is_pinned: boolean;
   is_locked?: boolean;
+  deleted_at?: string | null;
 }
 
 interface AdminContentTableProps {
@@ -44,7 +45,8 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
     queryFn: async () => {
       const { data } = await supabase
         .from('posts')
-        .select('id, title, is_pinned, is_locked, created_at, category_id, category:categories(name)')
+        .select('id, title, is_pinned, is_locked, deleted_at, created_at, category_id, category:categories(name)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .range(0, 99);
       return data as Post[] || [];
@@ -195,27 +197,22 @@ export function AdminContentTable({ initialPosts }: AdminContentTableProps) {
       cell: ({ row }) => {
         const post = row.original;
         return (
-          <div className="flex items-center gap-0.5">
-            <Link href={`/post/${post.id}`}>
-              <Button variant="ghost" size="icon-sm" className="rounded-lg" title="ดูกระทู้">
-                <Eye className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href={`/post/${post.id}/edit`}>
-              <Button variant="ghost" size="icon-sm" className="rounded-lg" title="แก้ไขกระทู้">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_pinned ? 'ถอดหมุด' : 'ปักหมุด'} onClick={() => handleTogglePin(post.id, post.is_pinned)}>
-              📌
+<div className="flex items-center gap-0.5">
+          <Link href={`/post/${post.id}`}>
+            <Button variant="ghost" size="icon-sm" className="rounded-lg" title="ดูกระทู้">
+              <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_locked ? 'ปลดล็อก' : 'ล็อกกระทู้'} onClick={() => handleToggleLock(post.id, post.is_locked || false)}>
-              {post.is_locked ? '🔓' : '🔒'}
-            </Button>
-            <Button variant="ghost" size="icon-sm" className="rounded-lg text-red-500 hover:text-red-600" title="ลบกระทู้" onClick={() => handleDelete(post.id)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          </Link>
+          <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_pinned ? 'ถอดหมุด' : 'ปักหมุด'} onClick={() => handleTogglePin(post.id, post.is_pinned)}>
+            📌
+          </Button>
+          <Button variant="ghost" size="icon-sm" className="rounded-lg" title={post.is_locked ? 'ปลดล็อก' : 'ล็อกกระทู้'} onClick={() => handleToggleLock(post.id, post.is_locked || false)}>
+            {post.is_locked ? '🔓' : '🔒'}
+          </Button>
+          <Button variant="ghost" size="icon-sm" className="rounded-lg text-red-500 hover:text-red-600" title="ลบกระทู้" onClick={() => handleDelete(post.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
         );
       },
     }),

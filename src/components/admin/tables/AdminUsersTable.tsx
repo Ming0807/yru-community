@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
 import * as XLSX from 'xlsx';
@@ -24,6 +25,9 @@ import type { Profile } from '@/types';
 interface AdminUsersTableProps {
   initialUsers: Profile[];
   totalCount: number;
+  currentPage?: number;
+  pageSize?: number;
+  searchQuery?: string;
 }
 
 const columnHelper = createColumnHelper<Profile>();
@@ -52,26 +56,56 @@ function getRoleBadge(role: Profile['role']) {
   }
 }
 
-export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTableProps) {
+export function AdminUsersTable({ initialUsers, totalCount, currentPage = 1, pageSize = 50, searchQuery = '' }: AdminUsersTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearch, setLocalSearch] = useState(searchQuery);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const supabase = useMemo(() => createClient(), []);
 
-  const { data: users = initialUsers, isLoading } = useQuery({
-    queryKey: ['admin', 'users', 'list'],
+  const { data: usersData, isLoading, refetch } = useQuery({
+    queryKey: ['admin', 'users', 'list', currentPage, pageSize, searchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(0, 99);
-      if (error) throw error;
-      return data as Profile[];
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+        ...(searchQuery ? { search: searchQuery } : {}),
+      });
+      const res = await fetch(`/api/admin/users?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const result = await res.json();
+      return result as { users: Profile[]; total: number; page: number; totalPages: number };
     },
-    placeholderData: (prev) => prev ?? initialUsers,
+    initialData: {
+      users: initialUsers,
+      total: totalCount,
+      page: currentPage,
+      totalPages: Math.ceil(totalCount / pageSize),
+    },
+    placeholderData: (prev) => prev,
   });
+
+  const totalPages = usersData?.totalPages ?? Math.ceil(totalCount / pageSize);
+
+  const handlePageChange = useCallback((newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', String(newPage));
+    router.push(`/admin/users?${params.toString()}`);
+  }, [router, searchParams]);
+
+  const handleSearch = useCallback((query: string) => {
+    setLocalSearch(query);
+    const params = new URLSearchParams(searchParams.toString());
+    if (query) {
+      params.set('search', query);
+    } else {
+      params.delete('search');
+    }
+    params.set('page', '1');
+    router.push(`/admin/users?${params.toString()}`);
+  }, [router, searchParams]);
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: Partial<Profile> }) => {
@@ -86,18 +120,24 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
     onMutate: async ({ userId, updates }) => {
       await queryClient.cancelQueries({ queryKey: ['admin', 'users'] });
       const prev = queryClient.getQueryData(['admin', 'users', 'list']);
-      queryClient.setQueryData<Profile[]>(['admin', 'users', 'list'], (old) =>
-        old?.map((u) => (u.id === userId ? { ...u, ...updates } : u))
-      );
+      queryClient.setQueryData<{ users: Profile[] }>(['admin', 'users', 'list'], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          users: old.users.map((u) => (u.id === userId ? { ...u, ...updates } : u)),
+        };
+      });
       return { prev };
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['admin', 'users', 'list'], context?.prev);
-      toast.error('ไม่สามารถอัปเดตได้');
+      if (context?.prev) {
+        queryClient.setQueryData(['admin', 'users', 'list'], context.prev);
+      }
+      toast.error('เกิดข้อผิดพลาด');
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    onSuccess: () => {
       toast.success('อัปเดตสำเร็จ');
+      refetch();
     },
   });
 
@@ -135,14 +175,15 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
     },
   });
 
-  const filteredUsers = useMemo(() => {
+const filteredUsers = useMemo(() => {
+    const users = usersData?.users ?? [];
     if (!searchQuery) return users;
     const q = searchQuery.toLowerCase();
-    return users.filter(u => 
-      u.display_name?.toLowerCase().includes(q) || 
+    return users.filter(u =>
+      u.display_name?.toLowerCase().includes(q) ||
       u.email?.toLowerCase().includes(q)
     );
-  }, [users, searchQuery]);
+  }, [usersData?.users, searchQuery]);
 
   const columns = useMemo(() => [
     columnHelper.display({
@@ -263,6 +304,7 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
   ], [selectedIds, filteredUsers.length, updateUserMutation]);
 
   const handleExport = useCallback((onlySelected: boolean = false, format: 'xlsx' | 'csv' = 'xlsx') => {
+    const users = usersData?.users ?? [];
     const dataToExport = onlySelected && selectedIds.size > 0
       ? users.filter(u => selectedIds.has(u.id))
       : filteredUsers;
@@ -293,7 +335,7 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
       a.click();
       URL.revokeObjectURL(url);
     }
-  }, [filteredUsers, users, selectedIds]);
+  }, [filteredUsers, usersData?.users, selectedIds]);
 
   const bulkActions = [
     {
@@ -323,7 +365,7 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
-        <p className="text-sm text-muted-foreground">{totalCount} ผู้ใช้งาน</p>
+        <p className="text-sm text-muted-foreground">{(usersData?.total ?? totalCount)} ผู้ใช้งาน</p>
         <div className="flex gap-2 self-end">
           {selectedIds.size > 0 && (
             <DropdownMenu>
@@ -360,20 +402,20 @@ export function AdminUsersTable({ initialUsers, totalCount }: AdminUsersTablePro
         </div>
       </div>
 
-      <AdminDataTable
-        data={filteredUsers}
-        columns={columns}
-        pageSize={15}
-        searchable
-        searchPlaceholder="ค้นหาชื่อหรืออีเมล..."
-        onSearchChange={setSearchQuery}
-        searchQuery={searchQuery}
-        selectable
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onRowClick={(user) => window.location.href = `/admin/users/${user.id}`}
-        emptyMessage="ไม่พบผู้ใช้"
-      />
+<AdminDataTable
+    data={filteredUsers}
+    columns={columns}
+    pageSize={15}
+    searchable
+    searchPlaceholder="ค้นหาชื่อหรืออีเมล..."
+    onSearchChange={handleSearch}
+    searchQuery={localSearch}
+    selectable
+    selectedIds={selectedIds}
+    onSelectionChange={setSelectedIds}
+    onRowClick={(user) => window.location.href = `/admin/users/${user.id}`}
+    emptyMessage="ไม่พบผู้ใช้"
+  />
 
       <BulkActionsBar
         selectedCount={selectedIds.size}

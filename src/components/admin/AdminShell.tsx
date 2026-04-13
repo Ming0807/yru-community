@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Shield, LayoutDashboard, Users, UserCog, Award, MessageSquare, MessageCircle, Tags, FolderTree, Flag, ClipboardList, ShieldAlert, Megaphone, Bell, Settings, Globe, ArrowLeft, ArrowRight, ChevronDown, BarChart3, Menu } from 'lucide-react';
 import { AdminCommandPalette } from './AdminCommandPalette';
 import { AdminNotifications } from './AdminNotifications';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
@@ -46,7 +48,7 @@ const navGroups: NavGroup[] = [
     title: 'ความปลอดภัย & ตรวจสอบ',
     icon: ShieldAlert,
     items: [
-      { name: 'รายงานปัญหา', href: '/admin/reports', badge: 'new' },
+      { name: 'รายงานปัญหา', href: '/admin/reports' },
       { name: 'ประวัติการทำงาน', href: '/admin/audit' },
       { name: 'ตัวกรองคำหยาบ', href: '/admin/word-filter' },
     ],
@@ -72,7 +74,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['ภาพรวม']));
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
     const initial = new Set<string>();
     navGroups.forEach((group) => {
       const hasActive = group.items.some((item) => {
@@ -82,7 +88,18 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       if (hasActive) initial.add(group.title);
     });
     if (initial.size === 0) initial.add('ภาพรวม');
-    return initial;
+    setExpandedGroups(initial);
+  }, [pathname]);
+
+  const { data: pendingReportsCount } = useQuery({
+    queryKey: ['admin', 'pendingReportsCount'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/reports?status=pending&count=true');
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.count ?? 0;
+    },
+    refetchInterval: 60000,
   });
 
   const toggleGroup = (title: string) => {
@@ -170,16 +187,20 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                             'flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200',
                             active
                               ? 'bg-[var(--color-yru-pink)]/15 text-[var(--color-yru-pink)] font-medium'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                          )}
-                        >
-                          <span>{item.name}</span>
-                          {item.badge && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-yru-pink)] text-white rounded-full">
-                              {item.badge}
-                            </span>
-                          )}
-                        </Link>
+: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            )}
+          >
+            <span>{item.name}</span>
+            {item.href === '/admin/reports' && pendingReportsCount && pendingReportsCount > 0 ? (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-yru-pink)] text-white rounded-full">
+                {pendingReportsCount > 99 ? '99+' : pendingReportsCount}
+              </span>
+            ) : item.badge ? (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-yru-pink)] text-white rounded-full">
+                {item.badge}
+              </span>
+            ) : null}
+          </Link>
                       );
                     })}
                   </div>
@@ -257,14 +278,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <AdminCommandPalette />
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="md:hidden">
-              <AdminCommandPalette />
-            </div>
-            <AdminNotifications />
-            <div className="hidden md:block w-px h-6 bg-border/60 mx-1"></div>
-          </div>
+{/* Right Actions */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        <ThemeToggle />
+        <div className="md:hidden">
+          <AdminCommandPalette />
+        </div>
+        <AdminNotifications />
+        <div className="hidden md:block w-px h-6 bg-border/60 mx-1"></div>
+      </div>
         </header>
 
         {/* Mobile Navigation - Header with Hamburger */}

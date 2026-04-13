@@ -1,7 +1,47 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { logAdminAction } from '@/lib/admin-audit';
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+    const countOnly = searchParams.get('count') === 'true';
+
+    const supabase = await createClient();
+
+    if (countOnly) {
+      let query = supabase.from('reports').select('*', { count: 'exact', head: true });
+      if (status) {
+        query = query.eq('status', status);
+      }
+      const { count, error } = await query;
+      if (error) throw error;
+      return NextResponse.json({ count: count ?? 0 });
+    }
+
+    let query = supabase
+      .from('reports')
+      .select('*, reporter:profiles!reports_reporter_id_fkey(display_name, avatar_url), post:posts(id, title), comment:comments(id, content)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json(data ?? []);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   const auth = await requireAdmin();
