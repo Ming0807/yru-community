@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
       .range(from, to);
 
     if (search) {
-      query = query.ilike('title', `%${search}%`);
+      const escapedSearch = search.replace(/[%'"\\]/g, '\\$&');
+      query = query.ilike('title', `%${escapedSearch}%`);
     }
 
     if (category) {

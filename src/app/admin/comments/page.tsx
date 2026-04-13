@@ -5,9 +5,15 @@ import { AdminCommentsTable } from '@/components/admin/AdminCommentsClient';
 
 export const metadata = { title: 'จัดการความคิดเห็น - Admin | YRU Community' };
 
-export default async function AdminCommentsPage() {
+interface Props {
+  searchParams: Promise<{ page?: string; search?: string; status?: string }>;
+}
+
+const PAGE_SIZE = 50;
+
+export default async function AdminCommentsPage({ searchParams }: Props) {
   const supabase = await createClient();
-  
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
@@ -19,20 +25,58 @@ export default async function AdminCommentsPage() {
 
   if (profile?.role !== 'admin' && profile?.role !== 'moderator') redirect('/');
 
-  const { data: comments } = await supabase
-    .from('comments')
-    .select('id, content, created_at, post_id, author_id, post:posts(title), user:profiles(display_name, avatar_url)')
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const { page: pageParam = '1', search = '', status = 'all' } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-  const formattedComments = ((comments ?? []) as any[]).map((c) => ({
+  let query = supabase
+    .from('comments')
+    .select('id, content, created_at, post_id, author_id, is_deleted', { count: 'exact' })
+    .range(from, to)
+    .order('created_at', { ascending: false });
+
+  if (search) {
+    const escaped = search.replace(/[%'"\\]/g, '\\$&');
+    query = query.or(`content.ilike.%${escaped}%`);
+  }
+
+  if (status === 'active') {
+    query = query.is('is_deleted', false);
+  } else if (status === 'deleted') {
+    query = query.is('is_deleted', true);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    console.error('[AdminComments] Fetch error:', error.message);
+  }
+
+  const commentIds = (data ?? []).map((c: any) => c.id);
+  const postIds = [...new Set((data ?? []).map((c: any) => c.post_id).filter(Boolean))];
+  const authorIds = [...new Set((data ?? []).map((c: any) => c.author_id).filter(Boolean))];
+
+  const [postsData, profilesData, reportsData] = await Promise.all([
+    postIds.length > 0 ? supabase.from('posts').select('id, title').in('id', postIds) : { data: [] },
+    authorIds.length > 0 ? supabase.from('profiles').select('id, display_name, avatar_url').in('id', authorIds) : { data: [] },
+    commentIds.length > 0 ? supabase.from('reports').select('comment_id').in('comment_id', commentIds) : { data: [] },
+  ]);
+
+  const postsMap = new Map((postsData.data ?? []).map((p: any) => [p.id, p]));
+  const profilesMap = new Map((profilesData.data ?? []).map((p: any) => [p.id, p]));
+  const reportedIds = new Set((reportsData.data ?? []).map((r: any) => r.comment_id).filter(Boolean));
+
+  const comments = (data ?? []).map((c: any) => ({
     id: c.id,
     content: c.content,
     created_at: c.created_at,
     post_id: c.post_id,
-    post_title: c.post?.title,
     author_id: c.author_id,
-    user: c.user,
+    is_deleted: c.is_deleted ?? false,
+    post_title: postsMap.get(c.post_id)?.title,
+    user: profilesMap.get(c.author_id),
+    has_report: reportedIds.has(c.id),
   }));
 
   return (
@@ -47,7 +91,14 @@ export default async function AdminCommentsPage() {
         </div>
       </div>
 
-      <AdminCommentsTable initialComments={formattedComments} />
+      <AdminCommentsTable
+        initialComments={comments}
+        totalCount={count ?? 0}
+        currentPage={page}
+        pageSize={PAGE_SIZE}
+        searchQuery={search}
+        statusQuery={status}
+      />
     </div>
   );
 }

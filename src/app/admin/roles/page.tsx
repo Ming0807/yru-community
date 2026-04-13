@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { UserCog, Shield, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -124,7 +125,7 @@ export default async function AdminRolesPage() {
       </div>
 
       <p className="text-sm text-muted-foreground text-center">
-        การจัดการบทบาท - ดูที่ <a href="/admin/users" className="text-[var(--color-yru-pink)] hover:underline">หน้าจัดการผู้ใช้</a>
+        การจัดการบทบาท - ดูที่ <Link href="/admin/users" className="text-[var(--color-yru-pink)] hover:underline">หน้าจัดการผู้ใช้</Link>
       </p>
     </div>
   );

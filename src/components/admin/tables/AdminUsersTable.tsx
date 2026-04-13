@@ -113,7 +113,7 @@ placeholderData: (prev) => prev,
 
   const handleFilterChange = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) {
+    if (value && value !== 'all') {
       params.set(key, value);
     } else {
       params.delete(key);
@@ -437,36 +437,36 @@ const filteredUsers = useMemo(() => {
 
   {/* Filters */}
   <div className="flex flex-wrap gap-2 mb-4">
-    <Select value={statusFilter || ''} onValueChange={(v) => handleFilterChange('status', v)}>
+    <Select value={statusFilter || 'all'} onValueChange={(v) => handleFilterChange('status', v)}>
       <SelectTrigger className="w-[140px] h-9 rounded-xl">
         <SelectValue placeholder="สถานะ" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="all">ทั้งหมด</SelectItem>
         <SelectItem value="active">ใช้งาน</SelectItem>
         <SelectItem value="suspended">ระงับ</SelectItem>
         <SelectItem value="banned">แบน</SelectItem>
       </SelectContent>
     </Select>
 
-    <Select value={roleFilter || ''} onValueChange={(v) => handleFilterChange('role', v)}>
+    <Select value={roleFilter || 'all'} onValueChange={(v) => handleFilterChange('role', v)}>
       <SelectTrigger className="w-[140px] h-9 rounded-xl">
         <SelectValue placeholder="บทบาท" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="all">ทั้งหมด</SelectItem>
         <SelectItem value="admin">แอดมิน</SelectItem>
         <SelectItem value="moderator">ม็อด</SelectItem>
         <SelectItem value="user">สมาชิก</SelectItem>
       </SelectContent>
     </Select>
 
-    <Select value={facultyFilter || ''} onValueChange={(v) => handleFilterChange('faculty', v)}>
+    <Select value={facultyFilter || 'all'} onValueChange={(v) => handleFilterChange('faculty', v)}>
       <SelectTrigger className="w-[180px] h-9 rounded-xl">
         <SelectValue placeholder="คณะ" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="all">ทั้งหมด</SelectItem>
         <SelectItem value="คณะวิทยาศาสตร์">คณะวิทยาศาสตร์</SelectItem>
         <SelectItem value="คณะวิศวกรรมศาสตร์">คณะวิศวกรรมศาสตร์</SelectItem>
         <SelectItem value="คณะบริหารธุรกิจ">คณะบริหารธุรกิจ</SelectItem>

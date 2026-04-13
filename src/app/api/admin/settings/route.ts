@@ -15,7 +15,7 @@ export async function GET() {
       console.error('[Settings] Admin client error:', e);
       return NextResponse.json({ error: 'Server configuration error (Service Role Key missing)' }, { status: 500 });
     }
-    
+
     const { data, error } = await supabase
       .from('site_settings')
       .select('*')
@@ -26,11 +26,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
     }
 
-    // Convert to key-value format
-    const settings = (data ?? []).reduce((acc, s) => {
-      acc[s.key] = s.value;
-      return acc;
-    }, {} as Record<string, any>);
+    const settings: Record<string, any> = {};
+    for (const s of (data ?? [])) {
+      try {
+        settings[s.key] = typeof s.value === 'string' ? JSON.parse(s.value) : s.value;
+      } catch {
+        settings[s.key] = s.value;
+      }
+    }
 
     return NextResponse.json(settings);
   } catch (error) {
@@ -54,28 +57,21 @@ export async function PUT(req: NextRequest) {
 
     const { user } = auth;
     const body = await req.json();
-    
-    // Update multiple settings
-    const updates = Object.entries(body).map(([key, value]) => ({
-      key,
-      value,
-      updated_by: user?.id,
-      updated_at: new Date().toISOString(),
-    }));
 
-    for (const update of updates) {
+    for (const [key, value] of Object.entries(body)) {
+      const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
       const { error } = await supabase
         .from('site_settings')
         .upsert({
-          key: update.key,
-          value: update.value,
-          updated_by: update.updated_by,
-          updated_at: update.updated_at,
+          key,
+          value: jsonValue,
+          updated_by: user?.id,
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'key' });
 
       if (error) {
         console.error('[Settings] Update error:', error);
-        return NextResponse.json({ error: `Failed to update ${update.key}` }, { status: 500 });
+        return NextResponse.json({ error: `Failed to update ${key}` }, { status: 500 });
       }
     }
 

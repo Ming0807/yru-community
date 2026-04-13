@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter, usePathname } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
 import { AdminDataTable } from '@/components/admin/AdminDataTable';
 import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Eye, Trash2, Search, Filter } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { MessageCircle, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Comment {
@@ -30,6 +30,11 @@ interface Comment {
 
 interface AdminCommentsTableProps {
   initialComments: Comment[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+  searchQuery: string;
+  statusQuery: string;
 }
 
 const columnHelper = createColumnHelper<Comment>();
@@ -39,91 +44,56 @@ function getContentPreview(content: string, maxLength = 80) {
   return content.slice(0, maxLength) + '...';
 }
 
-export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps) {
+export function AdminCommentsTable({
+  initialComments,
+  totalCount,
+  currentPage,
+  pageSize,
+  searchQuery,
+  statusQuery,
+}: AdminCommentsTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'deleted'>('all');
-  const [reportFilter, setReportFilter] = useState<'all' | 'reported' | 'not_reported'>('all');
-  const supabase = useMemo(() => createClient(), []);
 
-  const { data: comments = initialComments } = useQuery({
-    queryKey: ['admin', 'comments'],
-    queryFn: async () => {
-      const { data: commentsData } = await supabase
-        .from('comments')
-        .select('id, content, created_at, post_id, author_id, post:posts(title), user:profiles(display_name, avatar_url)')
-        .order('created_at', { ascending: false })
-        .limit(200);
+  const totalPages = Math.ceil(totalCount / pageSize);
 
-      const { data: reports } = await supabase
-        .from('reports')
-        .select('comment_id')
-        .not('comment_id', 'is', null);
-      
-      const reportedIds = new Set(reports?.map((r: any) => r.comment_id).filter(Boolean) ?? []);
-      
-      return (commentsData ?? []).map((c: any) => ({
-        id: c.id,
-        content: c.content,
-        created_at: c.created_at,
-        post_id: c.post_id,
-        post_title: c.post?.title,
-        author_id: c.author_id,
-        user: c.user,
-        has_report: reportedIds.has(c.id),
-      })) as Comment[];
-    },
-    placeholderData: (prev) => prev ?? initialComments,
-  });
+  const navigateToPage = (page: number) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (searchQuery) params.set('search', searchQuery);
+    if (statusQuery && statusQuery !== 'all') params.set('status', statusQuery);
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
-  const filteredComments = useMemo(() => {
-    let result = comments;
-    
-    if (statusFilter !== 'all') {
-      result = result.filter(c => 
-        statusFilter === 'deleted' ? c.is_deleted : !c.is_deleted
-      );
-    }
+  const handleSearch = (value: string) => {
+    const params = new URLSearchParams();
+    params.set('page', '1');
+    if (value) params.set('search', value);
+    if (statusQuery && statusQuery !== 'all') params.set('status', statusQuery);
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
-    if (reportFilter !== 'all') {
-      result = result.filter(c =>
-        reportFilter === 'reported' ? c.has_report : !c.has_report
-      );
-    }
-    
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(c => 
-        c.content.toLowerCase().includes(q) ||
-        c.post_title?.toLowerCase().includes(q) ||
-        c.user?.display_name?.toLowerCase().includes(q)
-      );
-    }
-    
-    return result;
-  }, [comments, searchQuery, statusFilter, reportFilter]);
+  const handleStatusFilter = (status: string) => {
+    const params = new URLSearchParams();
+    params.set('page', '1');
+    if (searchQuery) params.set('search', searchQuery);
+    if (status !== 'all') params.set('status', status);
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (commentId: string) => {
       const res = await fetch(`/api/admin/comments?id=${commentId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed');
     },
-    onMutate: async (commentId) => {
-      await queryClient.cancelQueries({ queryKey: ['admin', 'comments'] });
-      const prev = queryClient.getQueryData(['admin', 'comments']);
-      queryClient.setQueryData<Comment[]>(['admin', 'comments'], (old) =>
-        old?.map(c => c.id === commentId ? { ...c, is_deleted: true } : c)
-      );
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['admin', 'comments'], context?.prev);
-      toast.error('ไม่สามารถลบได้');
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'comments'] });
       toast.success('ลบความคิดเห็นสำเร็จ');
+    },
+    onError: () => {
+      toast.error('ไม่สามารถลบได้');
     },
   });
 
@@ -131,29 +101,20 @@ export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps)
     mutationFn: async (ids: string[]) => {
       await Promise.all(ids.map(id => fetch(`/api/admin/comments?id=${id}`, { method: 'DELETE' })));
     },
-    onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ['admin', 'comments'] });
-      const prev = queryClient.getQueryData(['admin', 'comments']);
-      queryClient.setQueryData<Comment[]>(['admin', 'comments'], (old) =>
-        old?.map(c => ids.includes(c.id) ? { ...c, is_deleted: true } : c)
-      );
-      setSelectedIds(new Set());
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(['admin', 'comments'], context?.prev);
-      toast.error('ไม่สามารถลบได้');
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'comments'] });
+      setSelectedIds(new Set());
       toast.success('ลบความคิดเห็นสำเร็จ');
+    },
+    onError: () => {
+      toast.error('ไม่สามารถลบได้');
     },
   });
 
-  const handleDelete = (commentId: string) => {
+  const handleDelete = useCallback((commentId: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ที่จะลบความคิดเห็นนี้?')) return;
     deleteMutation.mutate(commentId);
-  };
+  }, [deleteMutation]);
 
   const columns = useMemo(() => [
     columnHelper.display({
@@ -161,12 +122,12 @@ export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps)
       header: () => (
         <input
           type="checkbox"
-          checked={selectedIds.size === filteredComments.length && filteredComments.length > 0}
+          checked={selectedIds.size === initialComments.length && initialComments.length > 0}
           onChange={() => {
-            if (selectedIds.size === filteredComments.length) {
+            if (selectedIds.size === initialComments.length) {
               setSelectedIds(new Set());
             } else {
-              setSelectedIds(new Set(filteredComments.filter(c => !c.is_deleted).map(c => c.id)));
+              setSelectedIds(new Set(initialComments.filter(c => !c.is_deleted).map(c => c.id)));
             }
           }}
           className="w-4 h-4 rounded cursor-pointer"
@@ -251,10 +212,10 @@ export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps)
               </Link>
             )}
             {!comment.is_deleted && (
-              <Button 
-                variant="ghost" 
-                size="icon-sm" 
-                className="rounded-lg text-red-500 hover:text-red-600" 
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-lg text-red-500 hover:text-red-600"
                 title="ลบความคิดเห็น"
                 onClick={() => handleDelete(comment.id)}
               >
@@ -265,9 +226,9 @@ export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps)
         );
       },
     }),
-  ], [selectedIds, filteredComments.length, deleteMutation]);
+  ], [selectedIds, initialComments, handleDelete]);
 
-  const activeComments = filteredComments.filter(c => !c.is_deleted);
+  const activeComments = initialComments.filter(c => !c.is_deleted);
   const bulkActions = [
     {
       id: 'delete',
@@ -290,77 +251,82 @@ export function AdminCommentsTable({ initialComments }: AdminCommentsTableProps)
           <MessageCircle className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
             {activeComments.length} ความคิดเห็น
-            {statusFilter !== 'all' && ` (${statusFilter === 'deleted' ? 'ถูกลบ' : 'ที่แสดง'})`}
+            {statusQuery !== 'all' && ` (${statusQuery === 'deleted' ? 'ถูกลบ' : 'ที่แสดง'})`}
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground mr-2">สถานะ:</span>
           <Button
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            variant={statusQuery === 'all' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('all')}
+            onClick={() => handleStatusFilter('all')}
             className="rounded-lg"
           >
             ทั้งหมด
           </Button>
           <Button
-            variant={statusFilter === 'active' ? 'default' : 'outline'}
+            variant={statusQuery === 'active' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('active')}
+            onClick={() => handleStatusFilter('active')}
             className="rounded-lg"
           >
             แสดง
           </Button>
           <Button
-            variant={statusFilter === 'deleted' ? 'default' : 'outline'}
+            variant={statusQuery === 'deleted' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('deleted')}
+            onClick={() => handleStatusFilter('deleted')}
             className="rounded-lg"
           >
             ถูกลบ
-          </Button>
-          <span className="text-xs text-muted-foreground mx-2">|</span>
-          <span className="text-xs text-muted-foreground mr-2">รายงาน:</span>
-          <Button
-            variant={reportFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setReportFilter('all')}
-            className="rounded-lg"
-          >
-            ทั้งหมด
-          </Button>
-          <Button
-            variant={reportFilter === 'reported' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setReportFilter('reported')}
-            className="rounded-lg text-orange-600"
-          >
-            ถูกรายงาน
-          </Button>
-          <Button
-            variant={reportFilter === 'not_reported' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setReportFilter('not_reported')}
-            className="rounded-lg"
-          >
-            ไม่ถูกรายงาน
           </Button>
         </div>
       </div>
 
       <AdminDataTable
-        data={filteredComments}
+        data={initialComments}
         columns={columns}
-        pageSize={15}
+        pageSize={pageSize}
         searchable
-        searchPlaceholder="ค้นหาความคิดเห็น, กระทู้, ผู้เขียน..."
-        onSearchChange={setSearchQuery}
+        searchPlaceholder="ค้นหาความคิดเห็น..."
+        onSearchChange={handleSearch}
         searchQuery={searchQuery}
         selectable
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         emptyMessage="ไม่พบความคิดเห็น"
       />
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border/60">
+          <div className="text-xs text-muted-foreground">
+            หน้า {currentPage} จาก {totalPages}
+            <span className="hidden sm:inline"> ({totalCount} รายการ)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="rounded-lg gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              ก่อนหน้า
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="rounded-lg gap-1"
+            >
+              ถัดไป
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <BulkActionsBar

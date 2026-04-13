@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Plus, Send, Eye, Trash2, Clock, Users, AlertCircle } from 'lucide-react';
+import { Bell, Plus, Send, Trash2, Clock, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface Announcement {
@@ -28,7 +27,6 @@ interface Announcement {
 
 export default function AdminAnnouncementsPage() {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createClient(), []);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ 
     title: '', 

@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Award, Plus, Users, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { Award, Plus, Users, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface Badge {
@@ -17,13 +16,12 @@ interface Badge {
   description: string | null;
   icon: string | null;
   color: string | null;
-  criteria: Record<string, any> | null;
+  criteria: Record<string, unknown> | null;
   user_count: number;
 }
 
 export default function AdminBadgesPage() {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createClient(), []);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newBadge, setNewBadge] = useState({ name: '', description: '', icon: '🏆', color: 'bg-yellow-100' });
 

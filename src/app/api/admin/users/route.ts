@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
       .range(from, to);
 
     if (search) {
-      query = query.or(`display_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const escapedSearch = search.replace(/[%'"\\]/g, '\\$&');
+      query = query.or(`display_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`);
     }
     if (status) {
       query = query.eq('status', status);

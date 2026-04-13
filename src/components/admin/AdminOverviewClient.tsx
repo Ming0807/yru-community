@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   StatCards,
   ActivityChart,
@@ -9,9 +9,8 @@ import {
   QuickActions,
   ReportsAlert,
 } from './overview';
-import type { OverviewData } from './overview/types';
-
-interface Props extends OverviewData {}
+import type { OverviewData, Stat } from './overview/types';
+import { useAdminStats } from '@/hooks/useAdminStats';
 
 function OverviewHeader() {
   const [period, setPeriod] = useState(7);
@@ -40,32 +39,48 @@ function OverviewHeader() {
 }
 
 export default function AdminOverviewClient({
-  stats,
+  stats: initialStats,
   activityData,
   categoryData,
   recentActivity,
-  pendingReports,
-}: Props) {
+  pendingReports: initialPendingReports,
+}: OverviewData) {
+  const { stats: liveStats } = useAdminStats({ enabled: true });
+
+  const stats: Stat[] = useMemo(() => {
+    if (liveStats) {
+      return [
+        { title: 'ผู้ใช้ทั้งหมด', value: liveStats.users, change: 0, trend: 'neutral' },
+        { title: 'กระทู้ทั้งหมด', value: liveStats.posts, change: 0, trend: 'neutral' },
+        { title: 'ความคิดเห็น', value: liveStats.comments, change: 0, trend: 'neutral' },
+        { title: 'แจ้งปัญหารอดำเนินการ', value: liveStats.pendingReports, change: 0, trend: 'neutral' },
+      ];
+    }
+    return initialStats;
+  }, [liveStats, initialStats]);
+
+  const pendingReports = liveStats?.pendingReports ?? initialPendingReports;
+
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <OverviewHeader />
-      
+
       {/* ส่วนที่ 1: การ์ดสถิติ */}
       <StatCards stats={stats} />
-      
+
       {/* ส่วนที่ 2: กราฟ (7 คอลัมน์) */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 sm:gap-6 w-full min-w-0">
         {/* 🟢 แก้ปัญหา UI พังตรงนี้: ใส่ lg:col-span-4 บังคับให้กราฟกินพื้นที่ 4 ส่วน */}
         <div className="lg:col-span-4 min-w-0 w-full">
           <ActivityChart data={activityData} />
         </div>
-        
+
         <div className="lg:col-span-3 flex flex-col gap-4 sm:gap-6 min-w-0 w-full">
           <ReportsAlert count={pendingReports} />
           <CategoryDistribution data={categoryData} />
         </div>
       </div>
-      
+
       {/* ส่วนที่ 3: กิจกรรมล่าสุด และ ทางลัด (3 คอลัมน์) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
         {/* 🟢 เพิ่ม min-w-0 เพื่อป้องกัน Layout ระเบิด */}

@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Globe, Shield, Bell, Palette, Database, Save, Loader2 } from 'lucide-react';
+import { Settings, Globe, Shield, Bell, Database, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface SiteSettings {
@@ -31,24 +30,39 @@ const defaultSettings: SiteSettings = {
 
 export default function AdminSettingsPage() {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createClient(), []);
+  const isInitializedRef = useRef(false);
 
-  const { data: settings = defaultSettings, isLoading } = useQuery({
+  const { data: settings, isLoading } = useQuery({
     queryKey: ['admin', 'settings'],
     queryFn: async () => {
       const res = await fetch('/api/admin/settings');
       if (!res.ok) throw new Error('Failed to fetch');
-      return res.json();
+      const data = await res.json();
+      return {
+        site_name: data.site_name ?? defaultSettings.site_name,
+        site_description: data.site_description ?? defaultSettings.site_description,
+        maintenance_mode: data.maintenance_mode ?? defaultSettings.maintenance_mode,
+        registration_open: data.registration_open ?? defaultSettings.registration_open,
+        email_verification_required: data.email_verification_required ?? defaultSettings.email_verification_required,
+        push_notifications_enabled: data.push_notifications_enabled ?? defaultSettings.push_notifications_enabled,
+      } as SiteSettings;
     },
     placeholderData: defaultSettings,
+    staleTime: 30000,
   });
 
-  const [localSettings, setLocalSettings] = useState<SiteSettings>(settings);
+  const [localSettings, setLocalSettings] = useState<SiteSettings>(defaultSettings);
 
-  // Update local settings when data loads
-  useMemo(() => {
-    if (settings) setLocalSettings(settings);
+  useEffect(() => {
+    if (settings && !isInitializedRef.current) {
+      isInitializedRef.current = true;
+      setLocalSettings(settings);
+    }
   }, [settings]);
+
+  const handleSettingChange = useCallback(<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -122,7 +136,7 @@ export default function AdminSettingsPage() {
                 <Input
                   id="siteName"
                   value={localSettings.site_name}
-                  onChange={(e) => setLocalSettings({ ...localSettings, site_name: e.target.value })}
+                  onChange={(e) => handleSettingChange('site_name', e.target.value)}
                   className="rounded-xl"
                 />
               </div>
@@ -131,7 +145,7 @@ export default function AdminSettingsPage() {
                 <Input
                   id="siteDesc"
                   value={localSettings.site_description}
-                  onChange={(e) => setLocalSettings({ ...localSettings, site_description: e.target.value })}
+                  onChange={(e) => handleSettingChange('site_description', e.target.value)}
                   className="rounded-xl"
                 />
               </div>
@@ -146,9 +160,9 @@ export default function AdminSettingsPage() {
                   <p className="font-medium">โหมดบำรุงรักษา</p>
                   <p className="text-sm text-muted-foreground">ปิดเว็บไซต์ชั่วคราวเพื่อปรับปรุงระบบ</p>
                 </div>
-                <Switch 
-                  checked={localSettings.maintenance_mode} 
-                  onCheckedChange={(v) => setLocalSettings({ ...localSettings, maintenance_mode: v })} 
+                <Switch
+                  checked={localSettings.maintenance_mode}
+                  onCheckedChange={(v) => handleSettingChange('maintenance_mode', v)}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -156,9 +170,9 @@ export default function AdminSettingsPage() {
                   <p className="font-medium">เปิดให้สมัครสมาชิก</p>
                   <p className="text-sm text-muted-foreground">อนุญาตให้ผู้ใช้ใหม่สมัครสมาชิก</p>
                 </div>
-                <Switch 
-                  checked={localSettings.registration_open} 
-                  onCheckedChange={(v) => setLocalSettings({ ...localSettings, registration_open: v })} 
+                <Switch
+                  checked={localSettings.registration_open}
+                  onCheckedChange={(v) => handleSettingChange('registration_open', v)}
                 />
               </div>
             </div>
@@ -181,9 +195,9 @@ export default function AdminSettingsPage() {
                   <p className="font-medium">ยืนยันอีเมล</p>
                   <p className="text-sm text-muted-foreground">บังคับให้ผู้ใช้ยืนยันอีเมลก่อนใช้งาน</p>
                 </div>
-                <Switch 
-                  checked={localSettings.email_verification_required} 
-                  onCheckedChange={(v) => setLocalSettings({ ...localSettings, email_verification_required: v })} 
+                <Switch
+                  checked={localSettings.email_verification_required}
+                  onCheckedChange={(v) => handleSettingChange('email_verification_required', v)}
                 />
               </div>
             </div>
@@ -206,9 +220,9 @@ export default function AdminSettingsPage() {
                   <p className="font-medium">Push Notifications</p>
                   <p className="text-sm text-muted-foreground">ส่งแจ้งเตือนผ่าน Push Notification</p>
                 </div>
-                <Switch 
-                  checked={localSettings.push_notifications_enabled} 
-                  onCheckedChange={(v) => setLocalSettings({ ...localSettings, push_notifications_enabled: v })} 
+                <Switch
+                  checked={localSettings.push_notifications_enabled}
+                  onCheckedChange={(v) => handleSettingChange('push_notifications_enabled', v)}
                 />
               </div>
             </div>

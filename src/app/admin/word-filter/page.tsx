@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Plus, Trash2, Search, AlertTriangle } from 'lucide-react';
+import { Shield, Plus, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface WordFilter {
@@ -20,7 +19,6 @@ interface WordFilter {
 
 export default function AdminWordFilterPage() {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createClient(), []);
   const [newWord, setNewWord] = useState('');
   const [newSeverity, setNewSeverity] = useState<'low' | 'medium' | 'high'>('medium');
   const [newAction, setNewAction] = useState<'flag' | 'warn' | 'block'>('warn');
@@ -51,7 +49,7 @@ export default function AdminWordFilterPage() {
       setNewWord('');
       toast.success('เพิ่มคำกรองสำเร็จ');
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || 'ไม่สามารถเพิ่มได้');
     },
   });
