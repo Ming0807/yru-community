@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || '';
+    const role = searchParams.get('role') || '';
+    const faculty = searchParams.get('faculty') || '';
 
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -26,6 +29,15 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       query = query.or(`display_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (role) {
+      query = query.eq('role', role);
+    }
+    if (faculty) {
+      query = query.eq('faculty', faculty);
     }
 
     const { data, error, count } = await query;

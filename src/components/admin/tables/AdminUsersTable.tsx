@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
@@ -28,6 +35,9 @@ interface AdminUsersTableProps {
   currentPage?: number;
   pageSize?: number;
   searchQuery?: string;
+  statusFilter?: string;
+  roleFilter?: string;
+  facultyFilter?: string;
 }
 
 const columnHelper = createColumnHelper<Profile>();
@@ -56,7 +66,16 @@ function getRoleBadge(role: Profile['role']) {
   }
 }
 
-export function AdminUsersTable({ initialUsers, totalCount, currentPage = 1, pageSize = 50, searchQuery = '' }: AdminUsersTableProps) {
+export function AdminUsersTable({
+  initialUsers,
+  totalCount,
+  currentPage = 1,
+  pageSize = 50,
+  searchQuery = '',
+  statusFilter,
+  roleFilter,
+  facultyFilter,
+}: AdminUsersTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -65,13 +84,16 @@ export function AdminUsersTable({ initialUsers, totalCount, currentPage = 1, pag
 
   const supabase = useMemo(() => createClient(), []);
 
-  const { data: usersData, isLoading, refetch } = useQuery({
-    queryKey: ['admin', 'users', 'list', currentPage, pageSize, searchQuery],
+  const { data: usersData, refetch } = useQuery({
+    queryKey: ['admin', 'users', 'list', currentPage, pageSize, searchQuery, statusFilter, roleFilter, facultyFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: String(pageSize),
         ...(searchQuery ? { search: searchQuery } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(roleFilter ? { role: roleFilter } : {}),
+        ...(facultyFilter ? { faculty: facultyFilter } : {}),
       });
       const res = await fetch(`/api/admin/users?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');
@@ -84,10 +106,21 @@ export function AdminUsersTable({ initialUsers, totalCount, currentPage = 1, pag
       page: currentPage,
       totalPages: Math.ceil(totalCount / pageSize),
     },
-    placeholderData: (prev) => prev,
+placeholderData: (prev) => prev,
   });
 
   const totalPages = usersData?.totalPages ?? Math.ceil(totalCount / pageSize);
+
+  const handleFilterChange = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    params.set('page', '1');
+    router.push(`/admin/users?${params.toString()}`);
+  }, [router, searchParams]);
 
   const handlePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -398,11 +431,67 @@ const filteredUsers = useMemo(() => {
                 CSV (.csv)
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+</DropdownMenu>
+  </div>
+</div>
 
-<AdminDataTable
+  {/* Filters */}
+  <div className="flex flex-wrap gap-2 mb-4">
+    <Select value={statusFilter || ''} onValueChange={(v) => handleFilterChange('status', v)}>
+      <SelectTrigger className="w-[140px] h-9 rounded-xl">
+        <SelectValue placeholder="สถานะ" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="active">ใช้งาน</SelectItem>
+        <SelectItem value="suspended">ระงับ</SelectItem>
+        <SelectItem value="banned">แบน</SelectItem>
+      </SelectContent>
+    </Select>
+
+    <Select value={roleFilter || ''} onValueChange={(v) => handleFilterChange('role', v)}>
+      <SelectTrigger className="w-[140px] h-9 rounded-xl">
+        <SelectValue placeholder="บทบาท" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="admin">แอดมิน</SelectItem>
+        <SelectItem value="moderator">ม็อด</SelectItem>
+        <SelectItem value="user">สมาชิก</SelectItem>
+      </SelectContent>
+    </Select>
+
+    <Select value={facultyFilter || ''} onValueChange={(v) => handleFilterChange('faculty', v)}>
+      <SelectTrigger className="w-[180px] h-9 rounded-xl">
+        <SelectValue placeholder="คณะ" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="">ทั้งหมด</SelectItem>
+        <SelectItem value="คณะวิทยาศาสตร์">คณะวิทยาศาสตร์</SelectItem>
+        <SelectItem value="คณะวิศวกรรมศาสตร์">คณะวิศวกรรมศาสตร์</SelectItem>
+        <SelectItem value="คณะบริหารธุรกิจ">คณะบริหารธุรกิจ</SelectItem>
+        <SelectItem value="คณะอื่นๆ">คณะอื่นๆ</SelectItem>
+      </SelectContent>
+    </Select>
+
+    {(statusFilter || roleFilter || facultyFilter) && (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-9 rounded-xl text-muted-foreground"
+        onClick={() => {
+          const params = new URLSearchParams();
+          params.set('page', '1');
+          if (searchQuery) params.set('search', searchQuery);
+          router.push(`/admin/users?${params.toString()}`);
+        }}
+      >
+        ล้างตัวกรอง
+      </Button>
+    )}
+  </div>
+
+  <AdminDataTable
     data={filteredUsers}
     columns={columns}
     pageSize={15}

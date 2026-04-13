@@ -5,13 +5,13 @@ import type { Profile } from '@/types';
 export const metadata = { title: 'จัดการผู้ใช้ - Admin | YRU Community' };
 
 interface Props {
-  searchParams: Promise<{ page?: string; search?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; status?: string; role?: string; faculty?: string }>;
 }
 
 const PAGE_SIZE = 50;
 
 export default async function AdminUsersPage({ searchParams }: Props) {
-  const { page: pageParam = '1', search = '' } = await searchParams;
+  const { page: pageParam = '1', search = '', status, role, faculty } = await searchParams;
   const page = Math.max(1, parseInt(pageParam) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -27,6 +27,15 @@ export default async function AdminUsersPage({ searchParams }: Props) {
   if (search) {
     query = query.or(`display_name.ilike.%${search}%,email.ilike.%${search}%`);
   }
+  if (status) {
+    query = query.eq('status', status);
+  }
+  if (role) {
+    query = query.eq('role', role);
+  }
+  if (faculty) {
+    query = query.eq('faculty', faculty);
+  }
 
   const { data, error, count } = await query;
 
@@ -41,6 +50,9 @@ export default async function AdminUsersPage({ searchParams }: Props) {
       currentPage={page}
       pageSize={PAGE_SIZE}
       searchQuery={search}
+      statusFilter={status}
+      roleFilter={role}
+      facultyFilter={faculty}
     />
   );
 }
