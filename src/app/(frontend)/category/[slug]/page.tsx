@@ -55,7 +55,7 @@ export default async function CategoryPage({
 
   let query = supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)', { count: 'exact' })
+    .select('*, author:profiles!posts_author_id_fkey(*), category:categories(*)', { count: 'exact' })
     .eq('category_id', dbCat.id)
     .eq('is_draft', false);
 

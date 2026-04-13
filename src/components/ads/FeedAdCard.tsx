@@ -1,7 +1,10 @@
+'use client';
+
 import Image from 'next/image';
 import { Megaphone, ExternalLink } from 'lucide-react';
 import type { Ad } from '@/types';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
+import { useMarketingConsent } from '@/hooks/useTrackingConsent';
 
 interface FeedAdCardProps {
   ad: Ad;
@@ -9,11 +12,11 @@ interface FeedAdCardProps {
 
 export default function FeedAdCard({ ad }: FeedAdCardProps) {
   const trackedRef = useRef(false);
+  const { canTrackConversion } = useMarketingConsent();
 
-  // Intersection Observer to track impressions when ad enters viewport
   const adRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || trackedRef.current) return;
-    
+
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
         trackAd('impression');
@@ -21,11 +24,13 @@ export default function FeedAdCard({ ad }: FeedAdCardProps) {
         observer.disconnect();
       }
     }, { threshold: 0.5 });
-    
+
     observer.observe(node);
   }, []);
 
   const trackAd = async (type: 'impression' | 'click') => {
+    if (!canTrackConversion) return;
+
     try {
       await fetch(`/api/ads/track`, {
         method: 'POST',
@@ -33,7 +38,7 @@ export default function FeedAdCard({ ad }: FeedAdCardProps) {
         body: JSON.stringify({ adId: ad.id, type })
       });
     } catch {
-      // fail silently
+      // fail silently - tracking is non-critical
     }
   };
 
@@ -43,24 +48,24 @@ export default function FeedAdCard({ ad }: FeedAdCardProps) {
   };
 
   return (
-    <article 
+    <article
       ref={adRef}
       className="bg-card rounded-2xl overflow-hidden border border-border/40 transition-all duration-300 hover:-translate-y-[2px] hover:border-[var(--color-yru-pink)]/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer relative group flex flex-col sm:flex-row gap-4"
       onClick={handleLinkClick}
     >
       <div className="w-full sm:w-1/3 h-40 sm:h-auto bg-muted flex items-center justify-center overflow-hidden shrink-0 border-r border-border/30 relative">
-        <Image 
-          src={ad.image_url} 
-          alt={ad.campaign_name} 
-          fill 
+        <Image
+          src={ad.image_url}
+          alt={ad.campaign_name}
+          fill
           sizes="(max-width: 640px) 100vw, 33vw"
-          className="object-cover transition-transform group-hover:scale-105" 
+          className="object-cover transition-transform group-hover:scale-105"
         />
         <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
           <Megaphone className="h-3 w-3" /> Sponsored
         </div>
       </div>
-      
+
       <div className="p-4 sm:pl-0 flex-1 flex flex-col justify-between">
         <div>
           <div className="text-xs text-[var(--color-yru-pink)] font-semibold mb-1 uppercase tracking-wide">Promoted</div>

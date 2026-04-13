@@ -24,6 +24,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Dashboard', href: '/admin' },
       { name: 'สถิติการใช้งาน', href: '/admin/analytics' },
+      { name: 'สถิติเหตุการณ์', href: '/admin/analytics/events' },
     ],
   },
   {
@@ -58,7 +59,19 @@ const navGroups: NavGroup[] = [
     icon: Megaphone,
     items: [
       { name: 'จัดการโฆษณา', href: '/admin/ads' },
+      { name: 'แพ็กเกจ', href: '/admin/packages' },
+      { name: 'แคมเปญ', href: '/admin/campaigns' },
+      { name: 'ประเมินราคา', href: '/admin/pricing-estimator' },
       { name: 'ประกาศระบบ', href: '/admin/announcements' },
+    ],
+  },
+  {
+    title: 'รายงาน & วิเคราะห์',
+    icon: BarChart3,
+    items: [
+      { name: 'รายงานรายได้', href: '/admin/revenue' },
+      { name: 'วิเคราะห์ตามคณะ', href: '/admin/faculty' },
+      { name: 'สถิติเหตุการณ์', href: '/admin/analytics/events' },
     ],
   },
   {

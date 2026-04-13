@@ -74,9 +74,9 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
       const offset = (nextPage - 1) * POSTS_PER_PAGE;
       const supabase = createClient();
 
-      let query = supabase
-        .from('posts')
-        .select('*, author:profiles(*), category:categories(*)')
+let query = supabase
+      .from('posts')
+      .select('*, author:profiles!posts_author_id_fkey(*), category:categories!posts_category_id_fkey(*)')
         .eq('is_draft', false);
 
       query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
@@ -105,8 +105,14 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
         });
         setPage(nextPage);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching more posts:', error);
+      // 🔥 For debugging: popup the exact error details to the user
+      if (error?.details) {
+        alert("FK Ambiguity Details: " + JSON.stringify(error.details));
+      } else if (error?.message) {
+        alert("Error: " + error.message);
+      }
     } finally {
       setIsLoading(false);
     }

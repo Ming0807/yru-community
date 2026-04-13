@@ -911,3 +911,114 @@
   background-size: 200% 100%;
 }
 
+/* Cookie Consent Styles */
+.cookie-consent-banner {
+  display: flex;
+  flex-direction: column;
+  background: oklch(1 0 0);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 768px) {
+  .cookie-consent-banner {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.dark .cookie-consent-banner {
+  background: oklch(0.16 0.012 270);
+}
+
+.cookie-consent-content {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+}
+
+.cookie-consent-header {
+  margin-bottom: 0.25rem;
+}
+
+.cookie-consent-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid oklch(0.93 0.003 260 / 0.5);
+  background: oklch(0.98 0.005 260 / 0.5);
+}
+
+@media (min-width: 768px) {
+  .cookie-consent-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-top: none;
+    border-left: 1px solid oklch(0.93 0.003 260 / 0.5);
+    justify-content: flex-end;
+  }
+}
+
+.dark .cookie-consent-actions {
+  background: oklch(0.14 0.012 270);
+  border-color: oklch(1 0 0 / 0.1);
+}
+
+.cookie-modal {
+  background: oklch(1 0 0);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+}
+
+.dark .cookie-modal {
+  background: oklch(0.16 0.012 270);
+}
+
+.cookie-modal-content {
+  /* Modal content styling handled by component */
+}
+
+.cookie-category-item {
+  border: 1px solid oklch(0.93 0.003 260 / 0.6);
+  transition: border-color 0.2s ease;
+}
+
+.cookie-category-item:hover {
+  border-color: oklch(0.93 0.003 260);
+}
+
+.dark .cookie-category-item {
+  border-color: oklch(1 0 0 / 0.1);
+  background: oklch(0.18 0.012 270);
+}
+
+/* Animation Keyframes */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+

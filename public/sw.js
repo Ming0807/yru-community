@@ -119,6 +119,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // For static assets (_next/static, images, fonts): Cache-first
+  // สำหรับ static assets (_next/static, images, fonts): Cache-first
   if (
     url.pathname.startsWith('/_next/static') ||
     url.pathname.match(/\.(png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|eot)$/)
@@ -127,14 +128,21 @@ self.addEventListener('fetch', (event) => {
       caches.open(DYNAMIC_CACHE).then((cache) =>
         cache.match(request).then((cached) => {
           if (cached) return cached;
-          return fetch(request).then((response) => {
-            if (response.ok) {
-              cache.put(request, response.clone());
-              // Trim cache in background
-              trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_SIZE);
-            }
-            return response;
-          });
+          
+          // บรรทัดที่ 130: เพิ่ม .catch เพื่อดักจับตอนเน็ตหลุด
+          return fetch(request)
+            .then((response) => {
+              if (response.ok) {
+                cache.put(request, response.clone());
+                trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_SIZE);
+              }
+              return response;
+            })
+            .catch((err) => {
+              console.warn('SW: Fetch failed for static asset:', url.pathname, err);
+              // ส่งกลับเป็น undefined หรือจะส่งรูป fallback เล็กๆ ก็ได้ครับ
+              return new Response('Network error occurred', { status: 408 });
+            });
         })
       )
     );

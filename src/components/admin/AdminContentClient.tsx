@@ -34,7 +34,7 @@ export default function AdminContentClient({ initialPosts, totalCount }: Props) 
     setLoadingMore(true);
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content_text, is_anonymous, created_at, author:profiles!author_id(display_name), category:categories(name, slug)')
+      .select('id, title, content_text, is_anonymous, created_at, author:profiles!posts_author_id_fkey(display_name), category:categories(name, slug)')
       .order('created_at', { ascending: false })
       .range(posts.length, posts.length + 99);
 

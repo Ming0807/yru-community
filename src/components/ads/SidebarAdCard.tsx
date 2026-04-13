@@ -1,8 +1,10 @@
-"use client";
-import Image from "next/image";
-import { ChevronRight } from "lucide-react";
-import type { Ad } from "@/types";
-import { useCallback, useRef } from "react";
+'use client';
+
+import Image from 'next/image';
+import { ChevronRight } from 'lucide-react';
+import type { Ad } from '@/types';
+import { useCallback, useRef } from 'react';
+import { useMarketingConsent } from '@/hooks/useTrackingConsent';
 
 interface SidebarAdCardProps {
   ad: Ad;
@@ -10,43 +12,43 @@ interface SidebarAdCardProps {
 
 export default function SidebarAdCard({ ad }: SidebarAdCardProps) {
   const trackedRef = useRef(false);
+  const { canTrackConversion } = useMarketingConsent();
 
   const adRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || trackedRef.current) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          trackAd("impression");
-          trackedRef.current = true;
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.5 },
-    );
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        trackAd('impression');
+        trackedRef.current = true;
+        observer.disconnect();
+      }
+    }, { threshold: 0.5 });
 
     observer.observe(node);
   }, []);
 
-  const trackAd = async (type: "impression" | "click") => {
+  const trackAd = async (type: 'impression' | 'click') => {
+    if (!canTrackConversion) return;
+
     try {
       await fetch(`/api/ads/track`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adId: ad.id, type }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adId: ad.id, type })
       });
     } catch {
-      // fail silently
+      // fail silently - tracking is non-critical
     }
   };
 
   const handleLinkClick = () => {
-    trackAd("click");
-    window.open(ad.target_url, "_blank");
+    trackAd('click');
+    window.open(ad.target_url, '_blank');
   };
 
   return (
-    <div 
+    <div
       ref={adRef}
       className="relative rounded-2xl overflow-hidden border border-border/40 bg-card group cursor-pointer transition-all duration-300 hover:-translate-y-[2px] hover:border-[var(--color-yru-pink)]/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
       onClick={handleLinkClick}

@@ -153,7 +153,7 @@ export default async function PostPage({ params }: PostPageProps) {
   // Get comments
   const { data: comments } = await supabase
     .from('comments')
-    .select('*, author:profiles(*)')
+    .select('*, author:profiles!comments_author_id_fkey(*)')
     .eq('post_id', id)
     .order('created_at', { ascending: true });
 

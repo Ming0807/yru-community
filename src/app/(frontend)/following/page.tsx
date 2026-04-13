@@ -85,7 +85,7 @@ async function FollowingFeed({ followingIds }: { followingIds: string[] }) {
   const supabase = await createClient();
   const { data: posts } = await supabase
     .from('posts')
-    .select('*, author:profiles(*), category:categories(*)')
+    .select('*, author:profiles!posts_author_id_fkey(*), category:categories(*)')
     .in('author_id', followingIds)
     .eq('is_draft', false)
     .order('created_at', { ascending: false })
