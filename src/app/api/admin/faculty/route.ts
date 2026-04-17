@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireModerator } from '@/lib/admin-auth';
+import type { FacultyStats } from '@/types/advertising/faculty';
 
 export async function GET(req: NextRequest) {
   try {
@@ -117,6 +118,7 @@ async function getFacultyAdStats(supabase: Awaited<ReturnType<typeof createClien
   const { data: campaigns } = await supabase
     .from('ad_campaigns')
     .select(`
+      id,
       target_faculties,
       final_price,
       status,

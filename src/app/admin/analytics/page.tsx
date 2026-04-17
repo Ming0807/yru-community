@@ -95,26 +95,50 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
     value: catCount[Number(id)]
   }));
 
-  // 4. Ad Performance
-  const { data: adsPerf } = await supabase
-    .from('ads')
-    .select('id, campaign_name, impressions, clicks, is_active, image_url, target_tags')
-    .order('impressions', { ascending: false })
-    .limit(5);
+  // 4. Ad Performance - Use v_ad_performance view if available (single source of truth)
+  // Fallback to ads table if view not available (migrations not yet run)
+  let adPerformanceData: any[] = [];
 
-  const adPerformanceData = adsPerf?.map((ad) => {
-    const ctr = ad.impressions > 0 ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : '0.00';
-    return {
-      id: ad.id,
-      name: ad.campaign_name,
-      CTR: Number(ctr),
-      Impressions: ad.impressions,
-      Clicks: ad.clicks,
-      isActive: ad.is_active,
-      imageUrl: ad.image_url,
-      targetTags: ad.target_tags || []
-    };
-  }) || [];
+  try {
+    const { data: adsPerf } = await supabase
+      .from('v_ad_performance')
+      .select('ad_id, ad_title, ad_status, campaign_name, total_impressions, total_clicks, ctr, viewability_rate')
+      .order('total_impressions', { ascending: false })
+      .limit(5);
+
+    adPerformanceData = (adsPerf || []).map((ad: any) => ({
+      id: ad.ad_id,
+      name: ad.ad_title || ad.campaign_name || 'Unknown',
+      CTR: ad.ctr ? Number(ad.ctr.toFixed(2)) : 0,
+      Impressions: ad.total_impressions || 0,
+      Clicks: ad.total_clicks || 0,
+      isActive: ad.ad_status === 'active',
+      imageUrl: null,
+      targetTags: [],
+      viewability: ad.viewability_rate || null
+    }));
+  } catch {
+    // Fallback to ads table if v_ad_performance view doesn't exist
+    const { data: adsPerf } = await supabase
+      .from('ads')
+      .select('id, campaign_name, impressions, clicks, is_active, image_url, target_tags')
+      .order('impressions', { ascending: false })
+      .limit(5);
+
+    adPerformanceData = (adsPerf || []).map((ad: any) => {
+      const ctr = ad.impressions > 0 ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : '0.00';
+      return {
+        id: ad.id,
+        name: ad.campaign_name,
+        CTR: Number(ctr),
+        Impressions: ad.impressions,
+        Clicks: ad.clicks,
+        isActive: ad.is_active,
+        imageUrl: ad.image_url,
+        targetTags: ad.target_tags || []
+      };
+    });
+  }
 
   return (
     <AdminAnalyticsClient 

@@ -5,6 +5,7 @@ import { timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import SidebarAdCard from '@/components/ads/SidebarAdCard';
 import { CATEGORIES } from '@/lib/constants';
+import { CookieSettingsTrigger } from '@/components/CookieSettingsTrigger';
 
 // Revalidate this component periodically (every minute)
 export const revalidate = 60; // 1 minute
@@ -153,13 +154,14 @@ export default async function RightSidebar({
         </div>
       </div>
 
-      {/* Footer Links */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/70 px-2">
-        <Link href="/about" className="hover:underline">เกี่ยวกับเรา</Link>
-        <Link href="/privacy" className="hover:underline">นโยบายความเป็นส่วนตัว</Link>
-        <Link href="/terms" className="hover:underline">ข้อตกลงการใช้งาน</Link>
-        <div className="w-full mt-2">© {new Date().getFullYear()} YRU Community. All rights reserved.</div>
-      </div>
+{/* Footer Links */}
+  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/70 px-2">
+    <Link href="/about" className="hover:underline">เกี่ยวกับเรา</Link>
+    <Link href="/privacy" className="hover:underline">นโยบายความเป็นส่วนตัว</Link>
+    <Link href="/terms" className="hover:underline">ข้อตกลงการใช้งาน</Link>
+    <CookieSettingsTrigger />
+    <div className="w-full mt-2">© {new Date().getFullYear()} YRU Community. All rights reserved.</div>
+  </div>
     </aside>
   );
 }

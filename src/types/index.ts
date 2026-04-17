@@ -127,6 +127,7 @@ export interface PostFilters {
 
 export interface Ad {
   id: string;
+  campaign_id?: string;
   campaign_name: string;
   image_url: string;
   target_url: string;
@@ -140,6 +141,7 @@ export interface Ad {
   target_tags?: string[];
   target_categories?: number[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Follow {

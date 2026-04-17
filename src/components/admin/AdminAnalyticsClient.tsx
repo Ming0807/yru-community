@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -20,7 +22,7 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { TrendingUp, Eye, MousePointerClick, Users, ImageIcon, Calendar } from 'lucide-react';
+import { TrendingUp, Eye, MousePointerClick, Users, ImageIcon, Calendar, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 const COLORS = ['#E88B9C', '#7EC8A4', '#FFB74D', '#A569BD', '#5DADE2'];
@@ -44,30 +46,54 @@ export default function AdminAnalyticsClient({
   adPerformanceData,
   days = 7,
 }: Props) {
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated] = useState(new Date());
   const dayOptions = [7, 30, 90];
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
       <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">สถิติพฤติกรรมผู้ใช้ & วิเคราะห์ข้อมูลระบบ</h1>
-          <p className="text-muted-foreground mt-1 text-sm">ตรวจสอบภาพรวมการใช้งาน ยอดเข้าชม และประสิทธิภาพโฆษณา</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            ตรวจสอบภาพรวมการใช้งาน ยอดเข้าชม และประสิทธิภาพโฆษณา
+            <span className="ml-2 text-xs text-muted-foreground/60">
+              อัปเดตล่าสุด: {lastUpdated.toLocaleTimeString('th-TH')}
+            </span>
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 bg-card border rounded-xl p-1">
-          <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
-          {dayOptions.map(d => (
-            <Link
-              key={d}
-              href={`/admin/analytics?days=${d}`}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                d === days
-                  ? 'bg-[var(--color-yru-pink)] text-white'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {d} วัน
-            </Link>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-lg border bg-card hover:bg-muted transition-colors disabled:opacity-50"
+            title="รีเฟรชข้อมูล"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="flex items-center gap-1.5 bg-card border rounded-xl p-1">
+            <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
+            {dayOptions.map(d => (
+              <Link
+                key={d}
+                href={`/admin/analytics?days=${d}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  d === days
+                    ? 'bg-[var(--color-yru-pink)] text-white'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {d} วัน
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -91,9 +117,9 @@ export default function AdminAnalyticsClient({
         <Card className="card-shadow border-border/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">กระทู้ในระบบ</CardTitle>
-            <div className="p-2 bg-(--color-yru-pink)/10 text-(--color-yru-pink-dark) rounded-full">
-              <Eye className="h-4 w-4" />
-            </div>
+<div className="p-2 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--color-yru-pink) 10%, transparent)' }}>
+<MousePointerClick className="h-4 w-4" style={{ color: 'var(--color-yru-pink-dark)' }} />
+</div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalPosts.toLocaleString()}</div>
@@ -106,9 +132,9 @@ export default function AdminAnalyticsClient({
         <Card className="card-shadow border-border/40">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">อัตราการคลิกโฆษณา (CTR)</CardTitle>
-            <div className="p-2 bg-yru-green/10 text-(--color-yru-green-dark) rounded-full">
-              <MousePointerClick className="h-4 w-4" />
-            </div>
+<div className="p-2 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--color-yru-green) 10%, transparent)' }}>
+<MousePointerClick className="h-4 w-4" style={{ color: 'var(--color-yru-green-dark)' }} />
+</div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.totalAdsCTR}%</div>

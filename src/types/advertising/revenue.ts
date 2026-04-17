@@ -63,7 +63,9 @@ export interface RevenueStats {
     revenueChange: number;
     revenueChangePercent: number;
     impressionsChange: number;
+    impressionsChangePercent: number;
     clicksChange: number;
+    clicksChangePercent: number;
     ctrChange: number;
   };
   daily: RevenuePeriod[];

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   StatCards,
   ActivityChart,
@@ -9,6 +10,7 @@ import {
   QuickActions,
   ReportsAlert,
 } from './overview';
+import { SegmentAnalysis } from './analytics';
 import type { OverviewData, Stat } from './overview/types';
 import { useAdminStats } from '@/hooks/useAdminStats';
 
@@ -61,6 +63,28 @@ export default function AdminOverviewClient({
 
   const pendingReports = liveStats?.pendingReports ?? initialPendingReports;
 
+  const { data: segmentsData } = useQuery({
+    queryKey: ['admin', 'segments'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/analytics/segments');
+      if (!res.ok) throw new Error('Failed to fetch segments');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const segments = useMemo(() => {
+    if (!segmentsData?.segments) return {};
+    const result: Record<string, { levels: { level: string; user_count: number; percentage: number }[]; total_users: number }> = {};
+    for (const seg of segmentsData.segments) {
+      result[seg.segment_type] = {
+        levels: seg.levels,
+        total_users: seg.total_users,
+      };
+    }
+    return result;
+  }, [segmentsData]);
+
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <OverviewHeader />
@@ -81,16 +105,25 @@ export default function AdminOverviewClient({
         </div>
       </div>
 
-      {/* ส่วนที่ 3: กิจกรรมล่าสุด และ ทางลัด (3 คอลัมน์) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
-        {/* 🟢 เพิ่ม min-w-0 เพื่อป้องกัน Layout ระเบิด */}
-        <div className="lg:col-span-2 min-w-0 w-full">
-          <RecentActivity items={recentActivity} />
-        </div>
-        <div className="lg:col-span-1 min-w-0 w-full">
-          <QuickActions />
-        </div>
+{/* ส่วนที่ 3: กิจกรรมล่าสุด และ ทางลัด (3 คอลัมน์) */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
+      {/* 🟢 เพิ่ม min-w-0 เพื่อป้องกัน Layout ระเบิด */}
+      <div className="lg:col-span-2 min-w-0 w-full">
+        <RecentActivity items={recentActivity} />
+      </div>
+      <div className="lg:col-span-1 min-w-0 w-full">
+        <QuickActions />
       </div>
     </div>
+
+    {/* ส่วนที่ 4: User Segments Analysis */}
+    {Object.keys(segments).length > 0 && (
+      <SegmentAnalysis
+        segments={segments}
+        totalUsers={segmentsData?.total_users || 0}
+        title="การวิเคราะห์ User Segments"
+      />
+    )}
+  </div>
   );
 }

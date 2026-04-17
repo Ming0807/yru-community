@@ -52,15 +52,16 @@ function CustomTooltipComponent({ active, payload, total }: CustomTooltipProps) 
 }
 
 interface RenderLabelProps {
-  cx: number;
-  cy: number;
-  midAngle: number;
-  innerRadius: number;
-  outerRadius: number;
-  percent: number;
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  percent?: number;
 }
 
 function renderCustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: RenderLabelProps) {
+  if (!cx || !cy || !midAngle || !innerRadius || !outerRadius || !percent) return null;
   if (percent < 0.05) return null;
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;

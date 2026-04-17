@@ -21,6 +21,7 @@ export interface CookieConsentContextValue {
   openSettings: () => void;
   closeSettings: () => void;
   resetConsent: () => void;
+  showBanner: () => void;
 }
 
 const defaultPreferences: ConsentPreferences = {
@@ -121,6 +122,11 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
     setIsModalOpen(false);
   }, []);
 
+  const showBanner = useCallback(() => {
+    setIsBannerVisible(true);
+    setIsModalOpen(false);
+  }, []);
+
   const hasConsent = preferences.analytics || preferences.marketing;
 
   return (
@@ -136,6 +142,7 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
         openSettings,
         closeSettings,
         resetConsent,
+        showBanner,
       }}
     >
       {children}

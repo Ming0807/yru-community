@@ -1,28 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogHeader,
+DialogTitle,
+DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuItem,
+DropdownMenuTrigger,
+DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Search, Plus, MoreHorizontal, Image as ImageIcon, ExternalLink, Megaphone, Trash2, Edit2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Ad } from '@/types';
+import type { AdCampaign } from '@/types/advertising';
 import Image from 'next/image';
 import { logAdminAction } from '@/lib/admin-audit';
 
@@ -37,7 +38,10 @@ export default function AdminAdsClient({ initialAds }: Props) {
   const [uploading, setUploading] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    campaign_id: '' as string | null,
     campaign_name: '',
     image_url: '',
     target_url: '',
@@ -51,6 +55,31 @@ export default function AdminAdsClient({ initialAds }: Props) {
   });
 
   const supabase = createClient();
+
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      setCampaignsLoading(true);
+      try {
+        const [activeRes, approvedRes] = await Promise.all([
+          fetch('/api/admin/campaigns?status=active'),
+          fetch('/api/admin/campaigns?status=approved')
+        ]);
+        const [activeData, approvedData] = await Promise.all([
+          activeRes.ok ? activeRes.json() : [],
+          approvedRes.ok ? approvedRes.json() : []
+        ]);
+        const allCampaigns = [...(activeData || []), ...(approvedData || [])];
+        const uniqueMap = new Map<string, AdCampaign>();
+        allCampaigns.forEach((c: AdCampaign) => uniqueMap.set(c.id, c));
+        setCampaigns(Array.from(uniqueMap.values()));
+      } catch (error) {
+        console.error('[AdminAds] Failed to fetch campaigns:', error);
+      } finally {
+        setCampaignsLoading(false);
+      }
+    };
+    fetchCampaigns();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -95,32 +124,42 @@ export default function AdminAdsClient({ initialAds }: Props) {
   };
 
   const saveAd = async () => {
-    if (!formData.campaign_name || !formData.image_url || !formData.target_url) {
+    const finalCampaignName = formData.campaign_id
+      ? campaigns.find(c => c.id === formData.campaign_id)?.campaign_name || formData.campaign_name
+      : formData.campaign_name;
+
+    if (!finalCampaignName || !formData.image_url || !formData.target_url) {
       toast.error('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
+
+    const payload = {
+      ...formData,
+      campaign_id: formData.campaign_id || null,
+      campaign_name: finalCampaignName,
+    };
 
     try {
       if (editingId) {
         const { error } = await supabase
           .from('ads')
-          .update(formData)
+          .update(payload)
           .eq('id', editingId);
 
         if (error) throw error;
-        setAds(prev => prev.map(a => a.id === editingId ? { ...a, ...formData } as Ad : a));
+        setAds(prev => prev.map(a => a.id === editingId ? { ...a, ...payload } as Ad : a));
 
         await logAdminAction('UPDATE_AD', {
           target_type: 'ad',
           target_id: editingId,
-          extra: { campaign_name: formData.campaign_name },
+          extra: { campaign_id: formData.campaign_id, campaign_name: finalCampaignName },
         });
 
         toast.success('อัปเดตโฆษณาสำเร็จ');
       } else {
         const { data, error } = await supabase
           .from('ads')
-          .insert([formData])
+          .insert([payload])
           .select()
           .single();
 
@@ -130,7 +169,7 @@ export default function AdminAdsClient({ initialAds }: Props) {
         await logAdminAction('CREATE_AD', {
           target_type: 'ad',
           target_id: data.id,
-          extra: { campaign_name: formData.campaign_name },
+          extra: { campaign_id: formData.campaign_id, campaign_name: finalCampaignName },
         });
 
         toast.success('เพิ่มโฆษณาสำเร็จ');
@@ -146,6 +185,7 @@ export default function AdminAdsClient({ initialAds }: Props) {
   const resetForm = () => {
     setEditingId(null);
     setFormData({
+      campaign_id: null,
       campaign_name: '',
       image_url: '',
       target_url: '',
@@ -162,6 +202,7 @@ export default function AdminAdsClient({ initialAds }: Props) {
   const editAd = (ad: Ad) => {
     setEditingId(ad.id);
     setFormData({
+      campaign_id: ad.campaign_id || null,
       campaign_name: ad.campaign_name,
       image_url: ad.image_url,
       target_url: ad.target_url,
@@ -258,17 +299,49 @@ export default function AdminAdsClient({ initialAds }: Props) {
                   {editingId ? 'แก้ไขรายละเอียดโฆษณา' : 'สร้างแคมเปญโฆษณาใหม่'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid md:grid-cols-2 gap-6 py-4">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">ชื่อแคมเปญ / โฆษณา</label>
-                    <Input
-                      value={formData.campaign_name}
-                      onChange={e => setFormData({...formData, campaign_name: e.target.value})}
-                      placeholder="เช่น โปรโมชั่นร้านคาเฟ่..."
-                    />
-                  </div>
+<div className="grid md:grid-cols-2 gap-6 py-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">เลือกแคมเปญ (หรือสร้างใหม่)</label>
+              <select
+                className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                value={formData.campaign_id || ''}
+                onChange={e => {
+                  const selectedId = e.target.value;
+                  const selected = campaigns.find(c => c.id === selectedId);
+                  setFormData({
+                    ...formData,
+                    campaign_id: selectedId || null,
+                    campaign_name: selected?.campaign_name || formData.campaign_name,
+                  });
+                }}
+                disabled={campaignsLoading}
+              >
+                <option value="">-- เลือกแคมเปญที่มีอยู่ --</option>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.campaign_name} ({c.status})
+                  </option>
+                ))}
+              </select>
+              {formData.campaign_id && (
+                <p className="text-xs text-muted-foreground">
+                  เลือกแล้ว: {campaigns.find(c => c.id === formData.campaign_id)?.campaign_name}
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">ชื่อโฆษณา {formData.campaign_id ? '(กรอกเองหรือจะใช้ชื่อแคมเปญ)' : '(หรือกรอกเพิ่มเติม)'}</label>
+              <Input
+                value={formData.campaign_name}
+                onChange={e => setFormData({...formData, campaign_name: e.target.value})}
+                placeholder={formData.campaign_id ? '' : 'เช่น โปรโมชั่นร้านคาเฟ่...'}
+                disabled={!!formData.campaign_id}
+                className={formData.campaign_id ? 'bg-muted/50' : ''}
+              />
+            </div>
 
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">รูปภาพแบนเนอร์</label>

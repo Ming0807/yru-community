@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, LayoutDashboard, Users, UserCog, Award, MessageSquare, MessageCircle, Tags, FolderTree, Flag, ClipboardList, ShieldAlert, Megaphone, Bell, Settings, Globe, ArrowLeft, ArrowRight, ChevronDown, BarChart3, Menu } from 'lucide-react';
+import { Shield, LayoutDashboard, Users, MessageSquare, ShieldAlert, Megaphone, BarChart3, Settings, ArrowLeft, ArrowRight, ChevronDown, Menu, Activity } from 'lucide-react';
 import { AdminCommandPalette } from './AdminCommandPalette';
 import { AdminNotifications } from './AdminNotifications';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 type NavGroup = {
   title: string;
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
       { name: 'แคมเปญ', href: '/admin/campaigns' },
       { name: 'ประเมินราคา', href: '/admin/pricing-estimator' },
       { name: 'ประกาศระบบ', href: '/admin/announcements' },
+      { name: 'Targeting Rules', href: '/admin/targeting' },
     ],
   },
   {
@@ -72,6 +74,9 @@ const navGroups: NavGroup[] = [
       { name: 'รายงานรายได้', href: '/admin/revenue' },
       { name: 'วิเคราะห์ตามคณะ', href: '/admin/faculty' },
       { name: 'สถิติเหตุการณ์', href: '/admin/analytics/events' },
+      { name: 'Cohort Analysis', href: '/admin/analytics/cohorts' },
+      { name: 'Funnel Analysis', href: '/admin/analytics/funnel' },
+      { name: 'Attribution Analysis', href: '/admin/analytics/attribution' },
     ],
   },
   {
@@ -100,6 +105,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       });
       if (hasActive) initial.add(group.title);
     });
+    // Add default if nothing matches
     if (initial.size === 0) initial.add('ภาพรวม');
     setExpandedGroups(initial);
   }, [pathname]);
@@ -116,6 +122,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   });
 
   const toggleGroup = (title: string) => {
+    // Automatically uncollapse sidebar if it's collapsed and user clicked a group
+    if (collapsed) {
+      setCollapsed(false);
+      setExpandedGroups(new Set([title]));
+      return;
+    }
+
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(title)) {
@@ -137,50 +150,70 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   );
 
   return (
-    <div className="min-h-screen bg-muted/20 flex flex-col md:flex-row">
-      {/* Sidebar - Fixed position */}
+    <div className="min-h-screen flex flex-col md:flex-row antialiased transition-colors duration-300">
+      {/* ----------------- SIDEBAR (DESKTOP) ----------------- */}
       <aside
         className={cn(
-          'hidden md:flex bg-background border-r border-border/50 flex-col fixed top-0 left-0 h-screen z-40 transition-all duration-300',
-          collapsed ? 'w-20' : 'w-64'
+          'hidden md:flex flex-col fixed top-0 left-0 h-screen z-40 transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
+          'bg-background border-r border-border/40 shadow-[1px_0_20px_rgba(0,0,0,0.02)]',
+          collapsed ? 'w-20' : 'w-[280px]'
         )}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center px-4 border-b border-border/50 flex-shrink-0">
-          <Link href="/admin" className="flex items-center gap-2.5 font-bold text-lg text-foreground hover:opacity-80 transition-opacity">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 text-white shadow-sm shadow-red-500/20 flex-shrink-0">
-              <Shield className="w-4.5 h-4.5" />
+        {/* Logo Area */}
+        <div className="h-[72px] flex items-center px-5 flex-shrink-0 transition-all duration-300">
+          <Link href="/admin" className={cn(
+            'flex items-center gap-3.5 hover:opacity-85 transition-opacity',
+            collapsed && 'justify-center w-full'
+          )}>
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-yru-pink)] to-rose-600 text-white shadow-lg shadow-rose-500/25 flex-shrink-0">
+              <Shield className="w-5 h-5 fill-white/10" />
             </div>
-            {!collapsed && <span>Admin Center</span>}
+            {!collapsed && (
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-[15px] leading-tight text-foreground truncate tracking-tight">Admin Center</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+                  <Activity className="w-3 h-3 text-[var(--color-yru-pink)]" /> System Active
+                </span>
+              </div>
+            )}
           </Link>
         </div>
 
         {/* Navigation - Scrollable */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-border/60 scrollbar-track-transparent hover:scrollbar-thumb-border">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 space-y-1.5 scrollbar-thin scrollbar-thumb-border/40 scrollbar-track-transparent">
           {navGroups.map((group) => {
             const Icon = group.icon;
             const isExpanded = expandedGroups.has(group.title);
             const hasActive = group.items.some((item) => isActive(item.href));
 
             return (
-              <div key={group.title} className="space-y-1">
+              <div key={group.title} className="relative group/nav">
+                {/* Main Group Button */}
                 <button
                   onClick={() => toggleGroup(group.title)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-left',
-                    hasActive || isExpanded
-                      ? 'bg-[var(--color-yru-pink)]/10 text-[var(--color-yru-pink)]'
+                    'w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl transition-all duration-200 text-left relative overflow-hidden',
+                    hasActive || (!collapsed && isExpanded)
+                      ? 'text-[var(--color-yru-pink)]'
                       : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                    collapsed && 'justify-center'
+                    collapsed && 'justify-center mt-2'
                   )}
                 >
-                  <Icon className="w-4.5 h-4.5 flex-shrink-0" />
+                  {/* Subtle active background effect behind icon/text */}
+                  {(hasActive || (!collapsed && isExpanded)) && (
+                    <div className="absolute inset-0 bg-[var(--color-yru-pink)]/10 z-0 pointer-events-none" />
+                  )}
+                  
+                  <Icon className={cn("w-[22px] h-[22px] flex-shrink-0 relative z-10", (hasActive || (!collapsed && isExpanded)) ? "stroke-[2.5px]" : "stroke-[2px]")} />
+                  
                   {!collapsed && (
                     <>
-                      <span className="flex-1 font-medium text-sm">{group.title}</span>
+                      <span className={cn("flex-1 text-[13.5px] relative z-10 tracking-[0.01em]", (hasActive || isExpanded) ? "font-semibold" : "font-medium")}>
+                        {group.title}
+                      </span>
                       <ChevronDown
                         className={cn(
-                          'w-4 h-4 transition-transform',
+                          'w-4 h-4 opacity-50 relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
                           !isExpanded && '-rotate-90'
                         )}
                       />
@@ -188,188 +221,229 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   )}
                 </button>
 
-                {!collapsed && isExpanded && (
-                  <div className="ml-4 pl-3 border-l border-border/40 space-y-1">
+                {/* Floating Tooltip for Collapsed Mode Nested inside button to be visible on hover */}
+                {collapsed && (
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 translate-x-2 px-3 py-2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-xs font-semibold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:translate-x-3 whitespace-nowrap z-50 transition-all duration-200 border border-border/50">
+                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-[5px] border-transparent border-r-popover/95" />
+                    {group.title}
+                  </div>
+                )}
+
+                {/* Sub-items */}
+                <div 
+                  className={cn(
+                    "grid transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+                    !collapsed && isExpanded ? "grid-rows-[1fr] opacity-100 pt-1 pb-3" : "grid-rows-[0fr] opacity-0"
+                  )}
+                >
+                  <div className="overflow-hidden space-y-0.5">
                     {group.items.map((item) => {
                       const active = isActive(item.href);
+                      // Calculate counts/badges
+                      const badgeValue = item.href === '/admin/reports' ? pendingReportsCount : item.badge;
+                      
                       return (
                         <Link
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            'flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200',
+                            'relative flex items-center justify-between px-4 py-[9px] ml-[18px] mr-1 rounded-lg text-[13px] transition-all duration-200 group/item leading-none',
                             active
-                              ? 'bg-[var(--color-yru-pink)]/15 text-[var(--color-yru-pink)] font-medium'
-: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            )}
-          >
-            <span>{item.name}</span>
-            {item.href === '/admin/reports' && pendingReportsCount && pendingReportsCount > 0 ? (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-yru-pink)] text-white rounded-full">
-                {pendingReportsCount > 99 ? '99+' : pendingReportsCount}
-              </span>
-            ) : item.badge ? (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-yru-pink)] text-white rounded-full">
-                {item.badge}
-              </span>
-            ) : null}
-          </Link>
+                              ? 'text-[var(--color-yru-pink)] font-semibold bg-[var(--color-yru-pink)]/5'
+                              : 'text-muted-foreground hover:text-foreground font-medium hover:bg-muted/40'
+                          )}
+                        >
+                          {/* Active Indicator Left Border */}
+                          {active && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-[var(--color-yru-pink)] rounded-r-md shadow-[0_0_8px_var(--color-yru-pink)]" />
+                          )}
+                          {!active && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] bg-border/80 rounded-full transition-colors group-hover/item:bg-muted-foreground/40" />
+                          )}
+
+                          <span className={cn('pl-2.5', active && 'opacity-100')}>{item.name}</span>
+                          
+                          {badgeValue && Number(badgeValue) > 0 ? (
+                            <Badge variant="default" className="h-5 px-1.5 text-[10px] min-w-[20px] flex justify-center bg-[var(--color-yru-pink)] text-white hover:bg-[var(--color-yru-pink)] border-none">
+                              {Number(badgeValue) > 99 ? '99+' : badgeValue}
+                            </Badge>
+                          ) : null}
+                        </Link>
                       );
                     })}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
         </nav>
 
         {/* Bottom Actions */}
-        <div className="p-3 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2">
+        <div className="p-4 bg-background border-t border-border/40 space-y-2.5 flex-shrink-0">
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
-              'flex items-center justify-center gap-2 px-4 py-2.5 w-full text-sm font-medium text-muted-foreground bg-muted/40 rounded-xl hover:bg-muted hover:text-foreground transition-all duration-200',
+              'group/btn flex items-center justify-center gap-2.5 px-4 py-2.5 w-full text-[13px] font-semibold text-muted-foreground bg-muted/40 rounded-xl hover:bg-muted hover:text-foreground transition-all duration-300',
               collapsed && 'px-2'
             )}
+            title={collapsed ? "ขยายแถบเมนู" : "ย่อแถบเมนู"}
           >
             {collapsed ? (
-              <ArrowRight className="w-4 h-4" />
+               <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-0.5" />
             ) : (
               <>
-                <ArrowLeft className="w-4 h-4" />
-                <span>ย่อ</span>
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover/btn:-translate-x-0.5" />
+                <span>ย่อแถบเมนู</span>
               </>
             )}
           </button>
-
+          
           <Link
             href="/"
             className={cn(
-              'flex items-center justify-center gap-2 px-4 py-2.5 w-full text-sm font-medium text-muted-foreground bg-muted/40 rounded-xl hover:bg-muted hover:text-foreground transition-all duration-200',
+              'group/back flex items-center justify-center gap-2.5 px-4 py-2.5 w-full text-[13px] font-semibold text-muted-foreground bg-muted/40 rounded-xl hover:bg-muted hover:text-foreground transition-all duration-300',
               collapsed && 'px-2'
             )}
+            title={collapsed ? "กลับสู่เว็บหลัก" : undefined}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover/back:-translate-x-0.5" />
             {!collapsed && <span>กลับสู่เว็บหลัก</span>}
           </Link>
         </div>
       </aside>
 
-      {/* Main Wrapper - with margin for fixed sidebar */}
-      <div className={cn(
-        'flex-1 flex flex-col min-w-0 transition-all duration-300',
-        collapsed ? 'md:ml-20' : 'md:ml-64'
-      )}>
-        {/* Header */}
-        <header className="sticky top-0 z-50 h-16 bg-background/90 backdrop-blur-xl border-b border-border/50 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Mobile Logo */}
-          <div className="md:hidden flex items-center gap-2 font-bold text-lg">
-            <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-br from-red-500 to-red-600 text-white">
-              <Shield className="w-4 h-4" />
+      {/* ----------------- MAIN WRAPPER ----------------- */}
+      <div 
+        className={cn(
+          'flex-1 flex flex-col min-w-0 transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[#FAFAFA] dark:bg-background',
+          collapsed ? 'md:ml-20' : 'md:ml-[280px]'
+        )}
+      >
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 h-[72px] bg-background/80 backdrop-blur-2xl border-b border-border/40 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm">
+          
+          {/* Mobile Menu Trigger & Logo */}
+          <div className="md:hidden flex items-center gap-3">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetContent side="left" className="w-[85%] max-w-[320px] p-0 border-r-0 flex flex-col bg-background">
+                <SheetHeader className="h-[72px] flex flex-row items-center gap-3.5 px-5 border-b border-border/40 text-left space-y-0">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-yru-pink)] to-rose-600 text-white shadow-lg shadow-rose-500/25">
+                      <Shield className="w-5 h-5 fill-white/10" />
+                    </div>
+                    <div className="flex flex-col">
+                      <SheetTitle className="font-bold text-[15px] leading-tight m-0">Admin Center</SheetTitle>
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+                        <Activity className="w-3 h-3 text-[var(--color-yru-pink)]" /> System Active
+                      </span>
+                    </div>
+                </SheetHeader>
+                
+                <div className="flex-1 overflow-y-auto px-4 py-5 scrollbar-none space-y-2">
+                  {navGroups.map((group) => {
+                    const Icon = group.icon;
+                    const isExpanded = expandedGroups.has(group.title);
+                    const hasActive = group.items.some((item) => isActive(item.href));
+                    
+                    return (
+                      <div key={group.title} className="space-y-1">
+                        <button
+                          onClick={() => toggleGroup(group.title)}
+                          className={cn(
+                            "w-full flex items-center gap-3.5 px-3 py-3 rounded-xl transition-colors",
+                            hasActive || isExpanded ? "bg-[var(--color-yru-pink)]/5" : "hover:bg-muted/50"
+                          )}
+                        >
+                          <Icon className={cn("w-[22px] h-[22px]", hasActive || isExpanded ? "text-[var(--color-yru-pink)] stroke-[2.5px]" : "text-muted-foreground stroke-[2px]")} />
+                          <span className={cn("flex-1 text-left text-[14px]", hasActive || isExpanded ? "font-semibold text-foreground pointer-events-none" : "font-medium text-muted-foreground")}>{group.title}</span>
+                          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform duration-300', isExpanded ? 'rotate-180' : '')} />
+                        </button>
+                        
+                        <div className={cn(
+                          "grid transition-all duration-300 ease-in-out",
+                          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                        )}>
+                          <div className="overflow-hidden">
+                            <div className="pl-11 pr-2 py-1 space-y-1">
+                              {group.items.map((item) => {
+                                const active = isActive(item.href);
+                                const badgeValue = item.href === '/admin/reports' ? pendingReportsCount : item.badge;
+                                
+                                return (
+                                  <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={cn(
+                                      'flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] transition-colors',
+                                      active
+                                        ? 'bg-[var(--color-yru-pink)]/10 text-[var(--color-yru-pink)] font-bold'
+                                        : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground'
+                                    )}
+                                  >
+                                    <span>{item.name}</span>
+                                    {badgeValue && Number(badgeValue) > 0 ? (
+                                      <Badge variant="default" className="h-[18px] px-1.5 text-[9px] min-w-[18px] flex justify-center bg-[var(--color-yru-pink)] text-white border-none">
+                                        {Number(badgeValue) > 99 ? '99+' : badgeValue}
+                                      </Badge>
+                                    ) : null}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 -ml-2 rounded-lg text-foreground transition-colors hover:bg-muted/80 focus:bg-muted focus:ring-2 focus:ring-muted"
+              aria-label="Open menu"
+            >
+              <Menu className="w-[22px] h-[22px]" />
+            </button>
+            
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[16px] tracking-tight text-foreground">Admin Center</span>
             </div>
-            <span>Admin</span>
           </div>
 
-          {/* Breadcrumb (Desktop) */}
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground flex-1 max-w-xl">
-            {currentGroup && (
+          {/* Breadcrumbs (Desktop) */}
+          <div className="hidden md:flex items-center gap-2.5 text-[13px] text-muted-foreground flex-1 max-w-xl">
+            {currentGroup && mounted && (
               <>
-                <span className="flex items-center gap-1.5">
-                  <currentGroup.icon className="w-4 h-4" />
-                  {currentGroup.title}
-                </span>
-                <span>/</span>
-                <span className="text-foreground font-medium">
+                <div className="flex items-center gap-2 text-foreground/70 justify-center">
+                  <currentGroup.icon className="w-4 h-4 opacity-75" strokeWidth={2.5}/>
+                  <span className="font-medium tracking-wide">{currentGroup.title}</span>
+                </div>
+                <span className="text-muted-foreground/30 font-medium">/</span>
+                <span className="font-semibold text-foreground border-b-2 border-[var(--color-yru-pink)]/30 pb-0.5">
                   {currentGroup.items.find((i) => isActive(i.href))?.name}
                 </span>
               </>
             )}
           </div>
 
-          {/* Desktop Search */}
-          <div className="hidden md:flex flex-1 max-w-md pr-8">
-            <AdminCommandPalette />
+          {/* Right Section: Command Palette & Controls */}
+          <div className="flex items-center justify-end gap-3 sm:gap-5 flex-1 w-full max-w-none md:max-w-none">
+            <div className="flex-1 max-w-[280px] lg:max-w-[400px] flex justify-end">
+             <AdminCommandPalette />
+            </div>
+            
+            <div className="flex items-center gap-2 pl-2 sm:pl-4 border-l border-border/50">
+              <ThemeToggle />
+              <AdminNotifications />
+            </div>
           </div>
-
-{/* Right Actions */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        <ThemeToggle />
-        <div className="md:hidden">
-          <AdminCommandPalette />
-        </div>
-        <AdminNotifications />
-        <div className="hidden md:block w-px h-6 bg-border/60 mx-1"></div>
-      </div>
         </header>
 
-        {/* Mobile Navigation - Header with Hamburger */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-background/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-40">
-          <div className="flex items-center gap-2 font-bold text-lg">
-            <div className="flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-br from-red-500 to-red-600 text-white">
-              <Shield className="w-4 h-4" />
-            </div>
-            <span>Admin</span>
-          </div>
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Mobile Menu Dialog */}
-        <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>เมนูแอดมิน</DialogTitle>
-              <DialogDescription>เลือกหมวดหมู่เมนูที่ต้องการ</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto py-2">
-              {navGroups.map((group) => {
-                const Icon = group.icon;
-                const isExpanded = expandedGroups.has(group.title);
-                
-                return (
-                  <div key={group.title} className="space-y-1">
-                    <button
-                      onClick={() => toggleGroup(group.title)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
-                    >
-                      <Icon className="w-5 h-5 text-[var(--color-yru-pink)]" />
-                      <span className="flex-1 font-medium">{group.title}</span>
-                      <ChevronDown className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="pl-9 space-y-1">
-                        {group.items.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className={cn(
-                              'block px-3 py-2 rounded-lg text-sm transition-colors',
-                              isActive(item.href)
-                                ? 'bg-[var(--color-yru-pink)]/10 text-[var(--color-yru-pink)] font-medium'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                            )}
-                          >
-                            {item.name}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* ----------------- PAGE CONTENT ----------------- */}
+        <main className="flex-1 overflow-y-auto relative">
+          <div className="p-4 sm:p-6 lg:p-8 mx-auto max-w-[1400px] relative z-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out fill-mode-both">
             {children}
           </div>
         </main>

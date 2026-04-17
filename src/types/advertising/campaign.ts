@@ -17,6 +17,11 @@ export interface AdCampaign {
   budget: number | null;
   daily_budget: number | null;
   status: CampaignStatus;
+  schedule_type: 'continuous' | 'scheduled' | 'dayparting';
+  schedule_time_start: string | null;
+  schedule_time_end: string | null;
+  schedule_days: number[];
+  timezone: string;
   created_at: string;
   updated_at: string;
   approved_by?: string | null;

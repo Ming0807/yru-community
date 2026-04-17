@@ -29,10 +29,10 @@ export function useCampaigns(statusFilter?: string) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: AdCampaignFormData }) => {
-      const res = await fetch('/api/admin/campaigns', {
+      const res = await fetch(`/api/admin/campaigns?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...data }),
+        body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Failed to update campaign');
       return res.json();

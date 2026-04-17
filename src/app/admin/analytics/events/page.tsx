@@ -302,32 +302,33 @@ export default function AdminAnalyticsEventsPage() {
             <div className="h-[300px] w-full flex items-center justify-center">
               {data.device_breakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.device_breakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="count"
-                      nameKey="device"
-                      label={({ device, percent }) => `${device} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
-                    >
-                      {data.device_breakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={DEVICE_COLORS[index % DEVICE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: '12px',
-                        border: '1px solid hsl(var(--border))',
-                        background: 'hsl(var(--card))',
-                      }}
-                      formatter={(value: number) => formatNumber(value)}
-                    />
-                  </PieChart>
+<PieChart>
+            <Pie
+              data={data.device_breakdown}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={5}
+              dataKey="count"
+              nameKey="device"
+              label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
+              labelLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+            >
+              {data.device_breakdown.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={DEVICE_COLORS[index % DEVICE_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                borderRadius: '12px',
+                border: '1px solid hsl(var(--border))',
+                background: 'hsl(var(--card))',
+              }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={(value: any) => formatNumber(Number(value))}
+            />
+          </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

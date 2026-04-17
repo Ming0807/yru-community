@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Wallet, RefreshCw, AlertTriangle, Bell } from 'lucide-react';
+import { Loader2, Wallet, RefreshCw, AlertTriangle, Bell, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   BudgetOverviewCards,
@@ -18,6 +19,11 @@ interface BudgetData {
   alerts: BudgetAlert[];
 }
 
+interface AlertsData {
+  alerts: any[];
+  summary: any[];
+}
+
 export default function BudgetPacingPage() {
   const queryClient = useQueryClient();
 
@@ -29,6 +35,50 @@ export default function BudgetPacingPage() {
       return res.json();
     },
     staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: alertsData } = useQuery<AlertsData>({
+    queryKey: ['admin', 'budget-alerts'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/budget/alerts?status=active');
+      if (!res.ok) throw new Error('Failed to fetch alerts');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const generateAlertsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/admin/budget/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_all' }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'budget-alerts'] });
+      toast.success('สร้างการแจ้งเตือนงบประมาณใหม่');
+    },
+    onError: () => toast.error('ไม่สามารถสร้างการแจ้งเตือนได้'),
+  });
+
+  const acknowledgeAlertMutation = useMutation({
+    mutationFn: async (alertId: string) => {
+      const res = await fetch('/api/admin/budget/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'acknowledge', alert_id: alertId }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'budget-alerts'] });
+      toast.success('ตกลง');
+    },
+    onError: () => toast.error('ไม่สามารถตกลงได้'),
   });
 
   const pauseMutation = useMutation({
@@ -105,19 +155,86 @@ export default function BudgetPacingPage() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="rounded-xl"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generateAlertsMutation.mutate()}
+            disabled={generateAlertsMutation.isPending}
+            className="rounded-xl gap-2"
+          >
+            <Bell className="h-4 w-4" />
+            {generateAlertsMutation.isPending ? 'กำลังสร้าง...' : 'สร้างการแจ้งเตือน'}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="rounded-xl"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
-      {/* Alerts */}
-      {data.alerts && data.alerts.length > 0 && (
+      {/* Alerts from budget_alerts table */}
+      {alertsData?.alerts && alertsData.alerts.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            การแจ้งเตือนงบประมาณ ({alertsData.alerts.length})
+          </h2>
+          {alertsData.alerts.map((alert: any) => (
+            <Card
+              key={alert.id}
+              className={`border-l-4 ${
+                alert.alert_severity === 'critical' ? 'border-l-red-500' :
+                alert.alert_severity === 'warning' ? 'border-l-yellow-500' :
+                'border-l-blue-500'
+              } bg-muted/30`}
+            >
+              <CardContent className="flex items-start gap-3 py-3">
+                <AlertTriangle className={`h-5 w-5 mt-0.5 shrink-0 ${
+                  alert.alert_severity === 'critical' ? 'text-red-500' :
+                  alert.alert_severity === 'warning' ? 'text-yellow-500' :
+                  'text-blue-500'
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground truncate">
+                      {alert.campaign?.campaign_name || alert.title}
+                    </p>
+                    <Badge variant="outline" className={`shrink-0 ${
+                      alert.status === 'acknowledged' ? 'bg-green-500/10 text-green-600' : ''
+                    }`}>
+                      {alert.status === 'acknowledged' ? 'ตกลงแล้ว' : 'รอดำเนินการ'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {alert.suggested_action}
+                  </p>
+                </div>
+                {alert.status !== 'acknowledged' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => acknowledgeAlertMutation.mutate(alert.id)}
+                    disabled={acknowledgeAlertMutation.isPending}
+                    className="rounded-lg shrink-0"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    ตกลง
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Legacy alerts from budget API */}
+      {data.alerts && data.alerts.length > 0 && !alertsData?.alerts?.length && (
         <div className="space-y-2">
           {data.alerts.map((alert, index) => (
             <Card
