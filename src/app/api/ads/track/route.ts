@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { validateClick } from '@/lib/ads/antifraud';
 
 export async function POST(request: Request) {
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
+    const adminClient = getAdminClient();
     const userAgent = request.headers.get('user-agent');
     
     // 1. Anti-Fraud Validation for Clicks
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
       event_timestamp: new Date().toISOString(),
     };
 
-    const { error: analyticsError } = await supabase
+    const { error: analyticsError } = await adminClient
       .from('user_analytics_events')
       .insert([eventRecord]);
 
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
     // 3. Update Aggregate Counters (Legacy Support & Quick Lookup)
     try {
       const rpcName = type === 'impression' ? 'increment_ad_impressions' : 'increment_ad_clicks';
-      await supabase.rpc(rpcName, { ad_id: adId });
+      await adminClient.rpc(rpcName, { ad_id: adId });
     } catch (err) {
       console.warn(`Ad tracking RPC failed:`, (err as Error).message);
     }
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
     // 4. Frequency Tracking
     if (type === 'impression' && userIdentifier) {
       try {
-        await supabase.rpc('increment_ad_frequency', {
+        await adminClient.rpc('increment_ad_frequency', {
           p_ad_id: adId,
           p_user_identifier: userIdentifier,
         });
@@ -85,8 +87,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'ad_id and user_id required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('check_ad_frequency_cap', {
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.rpc('check_ad_frequency_cap', {
       p_ad_id: adId,
       p_user_identifier: userIdentifier,
       p_max_views: 5,
