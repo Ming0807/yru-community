@@ -25,15 +25,19 @@ export async function GET(request: Request) {
       }
 
       // ตรวจสอบว่ามี profile หรือยัง
-      const { data: profile } = await supabase
+      const { data: profile, error: profileLookupError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, display_name, faculty')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
+
+      if (profileLookupError) {
+        console.error('[AuthCallback] Profile lookup failed:', profileLookupError);
+      }
 
       if (!profile) {
         // สร้าง profile เบื้องต้น
-        await supabase.from('profiles').insert({
+        const { error: createProfileError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           email: data.user.email!,
           display_name:
@@ -41,9 +45,17 @@ export async function GET(request: Request) {
             data.user.email?.split('@')[0] ??
             'ผู้ใช้ใหม่',
           avatar_url: data.user.user_metadata?.avatar_url ?? null,
-        });
+        }, { onConflict: 'id' });
+
+        if (createProfileError) {
+          console.error('[AuthCallback] Initial profile upsert failed:', createProfileError);
+        }
 
         // ไปหน้าตั้งค่าโปรไฟล์
+        return NextResponse.redirect(`${origin}/profile/setup`);
+      }
+
+      if (!profile.display_name?.trim() || !profile.faculty) {
         return NextResponse.redirect(`${origin}/profile/setup`);
       }
 

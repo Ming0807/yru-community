@@ -1,33 +1,18 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if ('error' in auth) return auth.error;
+
     const adminClient = getAdminClient();
     const { searchParams } = new URL(request.url);
 
     const cohortType = searchParams.get('type') || 'weekly'; // weekly, monthly, daily
     const weeks = parseInt(searchParams.get('weeks') || '8', 10);
-    const campaignId = searchParams.get('campaign_id');
     const compare = searchParams.get('compare') === 'true';
-
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
 // Calculate date range
   const endDate = new Date();
@@ -53,7 +38,7 @@ export async function GET(request: Request) {
   // Get all post activity in one query
   const { data: allPostActivity } = await adminClient
     .from('posts')
-    .select('user_id, created_at');
+    .select('author_id, created_at');
 
   // Group users by cohort
   const cohortMap: Record<string, {
@@ -73,7 +58,6 @@ export async function GET(request: Request) {
     } else {
       // Weekly - get the start of the week (Monday)
       const dayOfWeek = createdDate.getDay();
-      const diff = createdDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
       const weekStart = new Date(createdDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
       cohortKey = weekStart.toISOString().split('T')[0];
     }
@@ -101,11 +85,11 @@ export async function GET(request: Request) {
         (allPostActivity || [])
           .filter(p => {
             const postDate = new Date(p.created_at);
-            return cohortUserIds.has(p.user_id) &&
+            return cohortUserIds.has(p.author_id) &&
                    postDate >= weekStartDate &&
                    postDate < weekEndDate;
           })
-          .map(p => p.user_id)
+          .map(p => p.author_id)
       );
 
       cohort.weeklyActivity[w] = activeUsersInWeek.size;
@@ -203,11 +187,11 @@ export async function GET(request: Request) {
           (allPostActivity || [])
             .filter(p => {
               const postDate = new Date(p.created_at);
-              return cohortUserIds.has(p.user_id) &&
+              return cohortUserIds.has(p.author_id) &&
                 postDate >= weekStartDate &&
                 postDate < weekEndDate;
             })
-            .map(p => p.user_id)
+            .map(p => p.author_id)
         );
         cohort.weeklyActivity[w] = activeUsersInWeek.size;
       }

@@ -26,48 +26,18 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const tablesToClean = [
-      'user_analytics_events',
-      'posts',
-      'comments',
-      'post_reactions',
-      'follows',
-      'messages',
-      'notifications',
-      'audit_logs',
-      'online_presence',
-      'push_subscriptions',
-    ];
+    const { error } = await supabase.rpc('delete_user_account', {
+      p_user_id: userId,
+    });
 
-    const results: Record<string, { success: boolean; deleted?: number; error?: string }> = {};
-
-    for (const table of tablesToClean) {
-      try {
-        const { error } = await supabase
-          .from(table as any)
-          .delete()
-          .eq('user_id', userId);
-
-        if (error) {
-          results[table] = { success: false, error: error.message };
-        } else {
-          results[table] = { success: true, deleted: 0 };
-        }
-      } catch (err: any) {
-        results[table] = { success: false, error: err.message };
-      }
-    }
-
-    try {
-      await supabase.auth.admin.deleteUser(userId);
-    } catch (authError) {
-      console.warn('[PDPA Delete] Auth delete failed (may require service role):', authError);
+    if (error) {
+      console.error('[PDPA Delete] RPC failed:', error);
+      return NextResponse.json({ error: 'User data deletion failed' }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
       message: 'User data deletion completed',
-      results
     });
   } catch (error) {
     console.error('[PDPA Delete] Error:', error);

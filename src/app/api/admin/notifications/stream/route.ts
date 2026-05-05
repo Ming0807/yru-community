@@ -1,26 +1,37 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireModerator } from '@/lib/admin-auth';
 import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+type BudgetAlertRow = {
+  id: string;
+  alert_type: string;
+  alert_severity: string;
+  message: string;
+  created_at: string;
+  campaign?: { campaign_name?: string } | null;
+};
+
+type CampaignUpdateRow = {
+  id: string;
+  campaign_name: string;
+  status: string;
+  updated_at: string;
+};
+
+type ActiveAdRow = {
+  id: string;
+  campaign_name: string;
+  impressions: number;
+  clicks: number;
+};
+
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await requireModerator();
+  if ('error' in auth) return auth.error;
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin' && profile?.role !== 'moderator') {
-    return new Response('Forbidden', { status: 403 });
-  }
+  const { supabase } = auth;
 
   const encoder = new TextEncoder();
   let intervalId: ReturnType<typeof setInterval>;
@@ -44,7 +55,7 @@ export async function GET(request: NextRequest) {
           if (alerts && alerts.length > 0) {
             sendEvent('budget_alert', {
               count: alerts.length,
-              alerts: alerts.map((a: any) => ({
+              alerts: (alerts as BudgetAlertRow[]).map((a) => ({
                 id: a.id,
                 type: a.alert_type,
                 severity: a.alert_severity,
@@ -73,7 +84,7 @@ export async function GET(request: NextRequest) {
           if (campaigns && campaigns.length > 0) {
             sendEvent('campaign_update', {
               count: campaigns.length,
-              campaigns: campaigns.map((c: any) => ({
+              campaigns: (campaigns as CampaignUpdateRow[]).map((c) => ({
                 id: c.id,
                 name: c.campaign_name,
                 status: c.status,
@@ -97,10 +108,10 @@ export async function GET(request: NextRequest) {
             .limit(10);
 
           if (ads && ads.length > 0) {
-            const topPerformers = ads.filter((a: any) => a.clicks > 0).slice(0, 5);
+            const topPerformers = (ads as ActiveAdRow[]).filter((a) => a.clicks > 0).slice(0, 5);
             if (topPerformers.length > 0) {
               sendEvent('ad_performance', {
-                top_ads: topPerformers.map((a: any) => ({
+                top_ads: topPerformers.map((a) => ({
                   id: a.id,
                   name: a.campaign_name,
                   impressions: a.impressions,

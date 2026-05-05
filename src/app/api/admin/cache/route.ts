@@ -1,32 +1,22 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin, requireModerator } from '@/lib/admin-auth';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const auth = await requireModerator();
+    if ('error' in auth) return auth.error;
+
+    const { supabase } = auth;
+    const adminClient = getAdminClient();
     const { searchParams } = new URL(req.url);
 
     const action = searchParams.get('action');
     const cacheType = searchParams.get('type');
     const cacheKey = searchParams.get('key');
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin' && profile?.role !== 'moderator') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     if (action === 'stats') {
-      const { data: stats, error } = await supabase.rpc('get_cache_stats');
+      const { data: stats, error } = await adminClient.rpc('get_cache_stats');
       if (error) throw error;
 
       const { data: totalCount } = await supabase
@@ -67,7 +57,7 @@ export async function GET(req: NextRequest) {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (entry) {
-        await supabase.rpc('invalidate_cache', { p_cache_key: cacheKey });
+        await adminClient.rpc('invalidate_cache', { p_cache_key: cacheKey });
         return NextResponse.json({
           success: true,
           message: 'Cache entry refreshed',
@@ -85,24 +75,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if ('error' in auth) return auth.error;
+
+    const { supabase } = auth;
+    const adminClient = getAdminClient();
     const body = await req.json();
     const { action, cache_key, cache_type, tags, ttl_seconds, data } = body;
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     if (action === 'set') {
       if (!cache_key || !data) {
@@ -143,17 +122,17 @@ export async function POST(req: NextRequest) {
 
     if (action === 'invalidate') {
       if (cache_key) {
-        await supabase.rpc('invalidate_cache', { p_cache_key: cache_key });
+        await adminClient.rpc('invalidate_cache', { p_cache_key: cache_key });
         return NextResponse.json({ success: true, message: 'Cache invalidated', cache_key });
       }
 
       if (tags && Array.isArray(tags)) {
-        await supabase.rpc('invalidate_cache_by_tags', { p_tags: tags });
+        await adminClient.rpc('invalidate_cache_by_tags', { p_tags: tags });
         return NextResponse.json({ success: true, message: 'Cache invalidated by tags', tags });
       }
 
       if (cache_type) {
-        await supabase.rpc('invalidate_cache_by_type', { p_cache_type: cache_type });
+        await adminClient.rpc('invalidate_cache_by_type', { p_cache_type: cache_type });
         return NextResponse.json({ success: true, message: 'Cache invalidated by type', cache_type });
       }
 
@@ -161,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'clean') {
-      const { data: deleted } = await supabase.rpc('clean_expired_cache');
+      const { data: deleted } = await adminClient.rpc('clean_expired_cache');
       return NextResponse.json({
         success: true,
         message: 'Expired cache cleaned',
@@ -170,7 +149,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'warmup') {
-      await supabase.rpc('warmup_common_caches');
+      await adminClient.rpc('warmup_common_caches');
       return NextResponse.json({
         success: true,
         message: 'Cache warmup initiated'

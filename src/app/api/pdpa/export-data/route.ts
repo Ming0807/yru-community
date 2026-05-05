@@ -28,12 +28,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const exportData: Record<string, any[]> = {};
+    const exportData: Record<string, unknown[]> = {};
 
     const tablesToExport = [
       { name: 'profile', query: supabase.from('profiles').select('*').eq('id', userId) },
-      { name: 'posts', query: supabase.from('posts').select('*').eq('user_id', userId) },
-      { name: 'comments', query: supabase.from('comments').select('*').eq('user_id', userId) },
+      { name: 'posts', query: supabase.from('posts').select('*').eq('author_id', userId) },
+      { name: 'comments', query: supabase.from('comments').select('*').eq('author_id', userId) },
       { name: 'post_reactions', query: supabase.from('post_reactions').select('*').eq('user_id', userId) },
       { name: 'follows', query: supabase.from('follows').select('*').eq('follower_id', userId) },
       { name: 'following', query: supabase.from('follows').select('*').eq('following_id', userId) },

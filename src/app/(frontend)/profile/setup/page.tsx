@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, FormEvent, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/components/UserProvider';
@@ -11,10 +11,30 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+function withTimeout<T>(operation: T, timeoutMs = 8000): Promise<Awaited<T>> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Operation timed out'));
+    }, timeoutMs);
+
+    Promise.resolve(operation).then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value as Awaited<T>);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    );
+  });
+}
+
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { refresh } = useUser();
   const supabase = createClient();
+  const [isNavigating, startTransition] = useTransition();
 
   const [displayName, setDisplayName] = useState('');
   const [faculty, setFaculty] = useState('');
@@ -28,28 +48,41 @@ export default function ProfileSetupPage() {
 
   useEffect(() => {
     async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), 5000);
+        const user = session?.user;
 
-      if (!user) {
-        router.push('/login');
-        return;
+        if (!user) {
+          router.replace('/login');
+          return;
+        }
+
+        setLoading(false);
+
+        const { data: profile, error } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+        );
+
+        if (error) throw error;
+
+        if (profile) {
+          setDisplayName(profile.display_name || '');
+          setFaculty(profile.faculty || '');
+          setMajor(profile.major || '');
+          setAvatarUrl(profile.avatar_url || null);
+        }
+      } catch (error) {
+        console.error('[ProfileSetup] Failed to load profile:', error);
+        toast.error('ไม่สามารถโหลดโปรไฟล์ได้ กรุณาลองใหม่');
+      } finally {
+        setLoading(false);
       }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profile) {
-        setDisplayName(profile.display_name || '');
-        setFaculty(profile.faculty || '');
-        setMajor(profile.major || '');
-        setAvatarUrl(profile.avatar_url || null);
-      }
-      setLoading(false);
     }
 
     loadProfile();
@@ -109,39 +142,57 @@ export default function ProfileSetupPage() {
 
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await withTimeout(supabase.auth.getSession(), 5000);
+      const user = session?.user;
 
       if (!user) {
-        router.push('/login');
+        router.replace('/login');
         return;
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          email: user.email!,
-          display_name: displayName.trim(),
-          faculty,
-          major: major.trim() || null,
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(),
-        });
+      const { error } = await withTimeout(
+        supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            email: user.email!,
+            display_name: displayName.trim(),
+            faculty,
+            major: major.trim() || null,
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' })
+          .select('id')
+          .single()
+      );
 
       if (error) throw error;
 
-      await refresh();
-      router.refresh();
+      void refresh().catch((error) => {
+        console.error('[ProfileSetup] Background profile refresh failed:', error);
+      });
 
       toast.success('บันทึกโปรไฟล์สำเร็จ!');
-      router.push('/');
-    } catch {
+      startTransition(() => {
+        router.replace('/');
+        router.refresh();
+      });
+    } catch (error) {
+      console.error('[ProfileSetup] Failed to save profile:', error);
       toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)] px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[var(--color-yru-pink-light)] to-[var(--color-yru-green-light)] px-4">
@@ -242,10 +293,10 @@ export default function ProfileSetupPage() {
             {/* Submit */}
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploadingAvatar || isNavigating}
               className="w-full h-12 rounded-xl text-base bg-gradient-to-r from-[var(--color-yru-pink)] to-[var(--color-yru-pink-dark)] text-white shadow-lg hover:opacity-90"
             >
-              {submitting ? 'กำลังบันทึก...' : 'บันทึกโปรไฟล์'}
+              {submitting || isNavigating ? 'กำลังบันทึก...' : 'บันทึกโปรไฟล์'}
             </Button>
           </form>
         </div>

@@ -1,14 +1,61 @@
-import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+
+type EventTypeStatRow = {
+  event_type: string;
+  total_events: string | number;
+  unique_sessions: string | number;
+};
+
+type AdPerformanceRow = {
+  ad_id: string;
+  impressions: string | number;
+  clicks: string | number;
+  hovers: string | number;
+};
+
+type AnalyticsSummaryRow = {
+  total_events?: string | number;
+  unique_sessions?: string | number;
+  avg_events_per_session?: string | number;
+};
+
+type CustomEventStatRow = EventTypeStatRow & {
+  unique_users: string | number;
+};
+
+type VideoEngagementRow = {
+  video_id: string;
+  video_title: string;
+  total_views: string | number;
+  unique_viewers: string | number;
+  avg_progress: string | number;
+};
+
+type FormConversionRow = {
+  form_id: string;
+  form_name: string;
+  total_submissions: string | number;
+  unique_submitters: string | number;
+};
+
+type DeviceStatRow = {
+  device_type: string;
+  count: string | number;
+};
+
+type PageStatRow = {
+  page_path: string;
+  page_views: string | number;
+  unique_sessions: string | number;
+};
 
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAdmin();
     if ('error' in auth) return auth.error;
 
-    const supabase = await createClient();
     const adminClient = getAdminClient();
     const { searchParams } = new URL(req.url);
     const days = parseInt(searchParams.get('days') || '7');
@@ -64,29 +111,34 @@ const [
   .from('form_conversion_stats')
   .select('*')
   .limit(10)
-]);
+    ]);
 
     // Process event type stats
-    const eventTypes = (eventTypeStatsResult.data || []).map((row: any) => ({
+    const eventTypes = ((eventTypeStatsResult.data || []) as EventTypeStatRow[]).map((row) => ({
       event_type: row.event_type,
-      total_events: parseInt(row.total_events),
-      unique_sessions: parseInt(row.unique_sessions)
+      total_events: parseInt(String(row.total_events)),
+      unique_sessions: parseInt(String(row.unique_sessions))
     }));
 
-const adPerformance = (adStatsResult.data || []).map((row: any) => ({
-  ad_id: row.ad_id,
-  impressions: parseInt(row.impressions) || 0,
-  clicks: parseInt(row.clicks) || 0,
-  hovers: parseInt(row.hovers) || 0,
-  ctr: row.impressions > 0 ? ((row.clicks / row.impressions) * 100).toFixed(2) : '0.00'
-}));
+const adPerformance = ((adStatsResult.data || []) as AdPerformanceRow[]).map((row) => {
+  const impressions = parseInt(String(row.impressions)) || 0;
+  const clicks = parseInt(String(row.clicks)) || 0;
+
+  return {
+    ad_id: row.ad_id,
+    impressions,
+    clicks,
+    hovers: parseInt(String(row.hovers)) || 0,
+    ctr: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00',
+  };
+});
 
     // Get summary counts
-    const summary: any = summaryResult.data || {
+    const summary = (summaryResult.data || {
       total_events: 0,
       unique_sessions: 0,
       avg_events_per_session: '0.00'
-    };
+    }) as AnalyticsSummaryRow;
 
 return NextResponse.json({
     period: {
@@ -102,35 +154,35 @@ return NextResponse.json({
     event_types: eventTypes,
     ad_performance: adPerformance,
     custom_events: {
-      stats: (customEventStatsResult.data || []).map((r: any) => ({
+      stats: ((customEventStatsResult.data || []) as CustomEventStatRow[]).map((r) => ({
         event_type: r.event_type,
-        total_events: parseInt(r.total_events),
-        unique_sessions: parseInt(r.unique_sessions),
-        unique_users: parseInt(r.unique_users)
+        total_events: parseInt(String(r.total_events)),
+        unique_sessions: parseInt(String(r.unique_sessions)),
+        unique_users: parseInt(String(r.unique_users))
       })),
-      video_engagement: (videoStatsResult.data || []).map((r: any) => ({
+      video_engagement: ((videoStatsResult.data || []) as VideoEngagementRow[]).map((r) => ({
         video_id: r.video_id,
         video_title: r.video_title,
-        total_views: parseInt(r.total_views),
-        unique_viewers: parseInt(r.unique_viewers),
-        avg_progress: parseFloat(r.avg_progress || 0).toFixed(1)
+        total_views: parseInt(String(r.total_views)),
+        unique_viewers: parseInt(String(r.unique_viewers)),
+        avg_progress: parseFloat(String(r.avg_progress || 0)).toFixed(1)
       })),
-      form_conversions: (formStatsResult.data || []).map((r: any) => ({
+      form_conversions: ((formStatsResult.data || []) as FormConversionRow[]).map((r) => ({
         form_id: r.form_id,
         form_name: r.form_name,
-        total_submissions: parseInt(r.total_submissions),
-        unique_submitters: parseInt(r.unique_submitters)
+        total_submissions: parseInt(String(r.total_submissions)),
+        unique_submitters: parseInt(String(r.unique_submitters))
       }))
     },
     recent_events: (recentEventsResult.data || []).slice(0, 10),
-    device_breakdown: (deviceStatsResult.data || []).map((d: any) => ({
+    device_breakdown: ((deviceStatsResult.data || []) as DeviceStatRow[]).map((d) => ({
       device: d.device_type,
-      count: parseInt(d.count)
+      count: parseInt(String(d.count))
     })),
-    top_pages: (pageStatsResult.data || []).map((p: any) => ({
+    top_pages: ((pageStatsResult.data || []) as PageStatRow[]).map((p) => ({
       page_path: p.page_path,
-      page_views: parseInt(p.page_views) || 0,
-      unique_views: parseInt(p.unique_sessions) || 0
+      page_views: parseInt(String(p.page_views)) || 0,
+      unique_views: parseInt(String(p.unique_sessions)) || 0
     }))
   });
   } catch (error) {

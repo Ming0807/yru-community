@@ -1,26 +1,12 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
 
-  const { data: posts } = await supabase
-    .from('posts')
-    .select('id', { count: 'exact', head: true });
-
-  const { data: users } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true });
-
-  const { data: comments } = await supabase
-    .from('comments')
-    .select('id', { count: 'exact', head: true });
-
-  const { data: reports } = await supabase
-    .from('reports')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending');
+  const { supabase } = auth;
 
 const encoder = new TextEncoder();
 

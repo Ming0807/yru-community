@@ -1,6 +1,33 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireModerator } from '@/lib/admin-auth';
+import { getAdminClient } from '@/lib/supabase/admin';
+
+type AnalyticsSummary = {
+  total_ad_clicks?: number;
+  total_ad_impressions?: number;
+};
+
+type TierCampaignRow = {
+  final_price?: number | string | null;
+  ad_packages?: { name?: string | null; tier?: string | null } | null;
+};
+
+type TimelineRow = {
+  period: string;
+  ad_impressions: number;
+  ad_clicks: number;
+};
+
+type TopCampaignRow = {
+  id: string;
+  campaign_id?: string | null;
+  parent_campaign_name?: string | null;
+  campaign_name?: string | null;
+  campaign_status?: string | null;
+  final_price?: number | string | null;
+  impressions?: number;
+  clicks?: number;
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,6 +35,7 @@ export async function GET(req: NextRequest) {
     if ('error' in auth) return auth.error;
 
     const supabase = auth.supabase;
+    const adminClient = getAdminClient();
     const { searchParams } = new URL(req.url);
     const range = searchParams.get('range') || '30d';
 
@@ -18,16 +46,15 @@ export async function GET(req: NextRequest) {
     // Previous period for comparison
     const periodDurationMs = to.getTime() - from.getTime();
     const prevStartDate = new Date(from.getTime() - periodDurationMs).toISOString();
-    const prevEndDate = startDate;
 
     // 1. Fetch Consolidated Analytics Summaries (Optimized via SQL RPC)
     const [currentSummary, previousSummary, timelineData, topCampaigns] = await Promise.all([
       // Current period summary
-      supabase.rpc('get_analytics_summary', { start_date: startDate }),
+      adminClient.rpc('get_analytics_summary', { start_date: startDate }),
       // Previous period summary (for comparison)
-      supabase.rpc('get_analytics_summary', { start_date: prevStartDate }),
+      adminClient.rpc('get_analytics_summary', { start_date: prevStartDate }),
       // Daily timeline for charts
-      supabase.rpc('get_events_timeline', { 
+      adminClient.rpc('get_events_timeline', {
         start_date: startDate, 
         end_date: endDate, 
         granularity: 'day' 
@@ -46,8 +73,8 @@ export async function GET(req: NextRequest) {
       throw new Error('Database analytics functions failed');
     }
 
-    const current = currentSummary.data[0] || {};
-    const previous = previousSummary.data[0] || {};
+    const current = (currentSummary.data[0] || {}) as AnalyticsSummary;
+    const previous = (previousSummary.data[0] || {}) as AnalyticsSummary;
 
     // 2. Fetch Additional Breakdown Stats
     const { data: byTier } = await supabase
@@ -62,7 +89,7 @@ export async function GET(req: NextRequest) {
       bronze: '#CD7F32', silver: '#C0C0C0', gold: '#FFD700', custom: '#7EC8A4'
     };
 
-    (byTier || []).forEach((c: any) => {
+    ((byTier || []) as TierCampaignRow[]).forEach((c) => {
       const tier = c.ad_packages?.tier || 'custom';
       const existing = tierMap.get(tier) || { 
         tier, 
@@ -79,11 +106,11 @@ export async function GET(req: NextRequest) {
     // 4. Calculate Comparison Metrics
     const comparison = {
       revenueChange: (current.total_ad_clicks || 0) * 10 - (previous.total_ad_clicks || 0) * 10, // Mock revenue calculation or adjust as needed
-      revenueChangePercent: calculatePercentChange(current.total_ad_clicks, previous.total_ad_clicks),
+      revenueChangePercent: calculatePercentChange(current.total_ad_clicks || 0, previous.total_ad_clicks || 0),
       impressionsChange: (current.total_ad_impressions || 0) - (previous.total_ad_impressions || 0),
-      impressionsChangePercent: calculatePercentChange(current.total_ad_impressions, previous.total_ad_impressions),
+      impressionsChangePercent: calculatePercentChange(current.total_ad_impressions || 0, previous.total_ad_impressions || 0),
       clicksChange: (current.total_ad_clicks || 0) - (previous.total_ad_clicks || 0),
-      clicksChangePercent: calculatePercentChange(current.total_ad_clicks, previous.total_ad_clicks),
+      clicksChangePercent: calculatePercentChange(current.total_ad_clicks || 0, previous.total_ad_clicks || 0),
       ctrChange: calculateCtr(current) - calculateCtr(previous)
     };
 
@@ -97,7 +124,7 @@ export async function GET(req: NextRequest) {
         totalCampaigns: 0 // Fetch count separately if needed
       },
       periodComparison: comparison,
-      daily: (timelineData.data || []).map((d: any) => ({
+      daily: ((timelineData.data || []) as TimelineRow[]).map((d) => ({
         date: new Date(d.period).toISOString().split('T')[0],
         impressions: d.ad_impressions,
         clicks: d.ad_clicks,
@@ -106,18 +133,23 @@ export async function GET(req: NextRequest) {
       })),
       byTier: Array.from(tierMap.values()),
       byPosition: [], // Can be fetched via another RPC if needed
-      topCampaigns: (topCampaigns.data || []).map((c: any) => ({
-        id: c.campaign_id || c.id,
-        campaignName: c.parent_campaign_name || c.campaign_name,
-        packageName: '-',
-        tier: '-',
-        status: c.campaign_status,
-        finalPrice: c.final_price,
-        impressions: c.impressions,
-        clicks: c.clicks,
-        ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
-        revenue: c.clicks * 10
-      }))
+      topCampaigns: ((topCampaigns.data || []) as TopCampaignRow[]).map((c) => {
+        const impressions = c.impressions || 0;
+        const clicks = c.clicks || 0;
+
+        return {
+          id: c.campaign_id || c.id,
+          campaignName: c.parent_campaign_name || c.campaign_name,
+          packageName: '-',
+          tier: '-',
+          status: c.campaign_status,
+          finalPrice: c.final_price,
+          impressions,
+          clicks,
+          ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          revenue: clicks * 10
+        };
+      })
     };
 
     return NextResponse.json(stats);
@@ -145,7 +177,7 @@ function calculatePercentChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
-function calculateCtr(data: any) {
+function calculateCtr(data: AnalyticsSummary) {
   if (!data || !data.total_ad_impressions || data.total_ad_impressions === 0) return 0;
-  return (data.total_ad_clicks / data.total_ad_impressions) * 100;
+  return ((data.total_ad_clicks || 0) / data.total_ad_impressions) * 100;
 }

@@ -1,11 +1,13 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import type { FunnelStage, FunnelData, FunnelStep } from '@/types/analytics/segments';
 
 export async function GET(request: Request) {
 try {
-const supabase = await createClient();
+const auth = await requireAdmin();
+if ('error' in auth) return auth.error;
+
 const adminClient = getAdminClient();
 const { searchParams } = new URL(request.url);
     
@@ -13,27 +15,9 @@ const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30', 10);
     const compareWithPrevious = searchParams.get('compare') === 'true';
 
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     // Date range
     const endDate = new Date();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const prevStartDate = new Date(Date.now() - days * 2 * 24 * 60 * 60 * 1000);
-    const prevEndDate = startDate;
 
     // Get campaign info if provided
     let campaignName = 'All Campaigns';

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { requireModerator } from '@/lib/admin-auth';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
 const CUSTOM_EVENT_TYPES = [
@@ -6,10 +8,93 @@ const CUSTOM_EVENT_TYPES = [
   'search', 'print', 'external_click'
 ];
 
+const MAX_BATCH_EVENTS = 25;
+const MAX_EVENT_DATA_BYTES = 8 * 1024;
+const EVENT_TYPE_PATTERN = /^[a-zA-Z0-9_.:-]{1,64}$/;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_EVENTS = 120;
+
+class TrackValidationError extends Error {
+  constructor(message: string, public status = 400) {
+    super(message);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLength);
+}
+
+function readNumber(
+  value: unknown,
+  options: { min?: number; max?: number; integer?: boolean } = {}
+): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return null;
+
+  const rounded = options.integer ? Math.trunc(parsed) : parsed;
+  const min = options.min ?? Number.NEGATIVE_INFINITY;
+  const max = options.max ?? Number.POSITIVE_INFINITY;
+  return Math.min(Math.max(rounded, min), max);
+}
+
+function readTimestamp(value: unknown): string {
+  if (typeof value !== 'string') return new Date().toISOString();
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString();
+
+  const now = Date.now();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const timestamp = Math.min(Math.max(date.getTime(), now - oneDayMs), now + 5 * 60 * 1000);
+  return new Date(timestamp).toISOString();
+}
+
+function readEventData(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+
+  const serialized = JSON.stringify(value);
+  if (serialized.length > MAX_EVENT_DATA_BYTES) {
+    throw new TrackValidationError('event_data too large', 413);
+  }
+
+  return value;
+}
+
+function readEventDataField(body: Record<string, unknown>, key: string): unknown {
+  if (body[key] !== undefined) return body[key];
+  return isRecord(body.event_data) ? body.event_data[key] : undefined;
+}
+
+function readEventType(body: Record<string, unknown>): string {
+  const eventType = readString(body.event_type, 64);
+  if (!eventType || !EVENT_TYPE_PATTERN.test(eventType)) {
+    throw new TrackValidationError('valid event_type required');
+  }
+  return eventType;
+}
+
+function getRateLimitIdentity(body: Record<string, unknown>, ip: string): string {
+  if (body.batch && Array.isArray(body.events)) {
+    const firstEvent = body.events.find(isRecord);
+    if (firstEvent) {
+      return readString(firstEvent.session_id, 80) || readString(firstEvent.anonymous_id, 80) || ip;
+    }
+  }
+
+  return readString(body.session_id, 80) || readString(body.anonymous_id, 80) || ip;
+}
+
 function parseEvent(body: Record<string, unknown>) {
   const {
     event_id,
-    event_type,
     event_data = {},
     session_id,
     page_path,
@@ -30,34 +115,32 @@ function parseEvent(body: Record<string, unknown>) {
   } = body;
 
   return {
-    event_id: event_id || null,
-    event_type: event_type as string,
-    event_data: event_data as Record<string, unknown>,
-    session_id: session_id || null,
-    page_path: page_path || null,
-    referrer: referrer || null,
-    device_type: device_type || null,
-    browser: browser || null,
-    os: os || null,
-    scroll_depth: scroll_depth ? Number(scroll_depth) : null,
-    time_on_page: time_on_page ? Number(time_on_page) : null,
-    hover_duration: hover_duration ? Number(hover_duration) : null,
-    post_id: post_id || null,
-    category_id: category_id ? Number(category_id) : null,
-    ad_id: ad_id || null,
-    ad_impression_id: ad_impression_id || null,
-    ad_position: ad_position || null,
-    ad_visibility: ad_visibility || null,
-    event_timestamp: event_timestamp ? new Date(event_timestamp as string).toISOString() : new Date().toISOString(),
+    event_id: readString(event_id, 128),
+    event_type: readEventType(body),
+    event_data: readEventData(event_data),
+    session_id: readString(session_id, 80),
+    page_path: readString(page_path, 512),
+    referrer: readString(referrer, 1024),
+    device_type: readString(device_type, 40),
+    browser: readString(browser, 80),
+    os: readString(os, 80),
+    scroll_depth: readNumber(scroll_depth, { min: 0, max: 100 }),
+    time_on_page: readNumber(time_on_page, { min: 0, max: 86400, integer: true }),
+    hover_duration: readNumber(hover_duration, { min: 0, max: 86400, integer: true }),
+    post_id: readString(post_id, 64),
+    category_id: readNumber(category_id, { min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }),
+    ad_id: readString(ad_id, 64),
+    ad_impression_id: readString(ad_impression_id, 64),
+    ad_position: readString(ad_position, 80),
+    ad_visibility: readString(ad_visibility, 40),
+    event_timestamp: readTimestamp(event_timestamp),
   };
 }
 
-function parseCustomEvent(body: Record<string, unknown>) {
+function parseCustomEvent(body: Record<string, unknown>, authUserId: string | null) {
   const {
-    event_type,
     session_id,
     anonymous_id,
-    user_id,
     page_path,
     referrer,
     device_type,
@@ -74,48 +157,84 @@ function parseCustomEvent(body: Record<string, unknown>) {
   } = body;
 
   return {
-    event_type: event_type as string,
-    session_id: session_id || null,
-    anonymous_id: anonymous_id || null,
-    user_id: user_id || null,
-    page_path: page_path || null,
-    referrer: referrer || null,
-    device_type: device_type || null,
-    browser: browser || null,
-    os: os || null,
-    form_id: form_id || null,
-    form_name: form_name || null,
-    form_type: form_type || null,
-    video_id: video_id || null,
-    video_title: video_title || null,
-    duration_watched: duration_watched ? Number(duration_watched) : null,
-    total_duration: total_duration ? Number(total_duration) : null,
-    progress_percent: progress_percent ? Number(progress_percent) : null,
-    content_type: content_type || null,
-    content_id: content_id || null,
-    share_method: share_method || null,
-    file_id: file_id || null,
-    file_name: file_name || null,
-    file_type: file_type || null,
-    file_size: file_size ? Number(file_size) : null,
-    search_query: search_query || null,
-    results_count: results_count ? Number(results_count) : null,
-    url: url || null,
-    link_text: link_text || null,
-    event_data: event_data as Record<string, unknown>,
-    event_timestamp: event_timestamp ? new Date(event_timestamp as string).toISOString() : new Date().toISOString(),
+    event_type: readEventType(body),
+    session_id: readString(session_id, 80),
+    anonymous_id: readString(anonymous_id, 80),
+    user_id: authUserId,
+    page_path: readString(page_path, 512),
+    referrer: readString(referrer, 1024),
+    device_type: readString(device_type, 40),
+    browser: readString(browser, 80),
+    os: readString(os, 80),
+    form_id: readString(form_id ?? readEventDataField(body, 'form_id'), 128),
+    form_name: readString(form_name ?? readEventDataField(body, 'form_name'), 255),
+    form_type: readString(form_type ?? readEventDataField(body, 'form_type'), 80),
+    video_id: readString(video_id ?? readEventDataField(body, 'video_id'), 128),
+    video_title: readString(video_title ?? readEventDataField(body, 'video_title'), 255),
+    duration_watched: readNumber(duration_watched ?? readEventDataField(body, 'duration_watched'), { min: 0, max: 86400, integer: true }),
+    total_duration: readNumber(total_duration ?? readEventDataField(body, 'total_duration'), { min: 0, max: 86400, integer: true }),
+    progress_percent: readNumber(progress_percent ?? readEventDataField(body, 'progress_percent'), { min: 0, max: 100 }),
+    content_type: readString(content_type ?? readEventDataField(body, 'content_type'), 80),
+    content_id: readString(content_id ?? readEventDataField(body, 'content_id'), 128),
+    share_method: readString(share_method ?? readEventDataField(body, 'share_method'), 80),
+    file_id: readString(file_id ?? readEventDataField(body, 'file_id'), 128),
+    file_name: readString(file_name ?? readEventDataField(body, 'file_name'), 255),
+    file_type: readString(file_type ?? readEventDataField(body, 'file_type'), 80),
+    file_size: readNumber(file_size ?? readEventDataField(body, 'file_size'), { min: 0, max: 1024 * 1024 * 1024, integer: true }),
+    search_query: readString(search_query ?? readEventDataField(body, 'search_query'), 255),
+    results_count: readNumber(results_count ?? readEventDataField(body, 'results_count'), { min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }),
+    url: readString(url ?? readEventDataField(body, 'url'), 1024),
+    link_text: readString(link_text ?? readEventDataField(body, 'link_text'), 255),
+    event_data: readEventData(event_data),
+    event_timestamp: readTimestamp(event_timestamp),
   };
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+
   try {
-    const body = await req.json();
+    const parsedBody: unknown = await req.json();
+    if (!isRecord(parsedBody)) {
+      return NextResponse.json({ error: 'Invalid tracking payload' }, { status: 400 });
+    }
+
+    const rateLimit = checkRateLimit(
+      `track:${ip}:${getRateLimitIdentity(parsedBody, ip)}`,
+      { limit: RATE_LIMIT_MAX_EVENTS, windowMs: RATE_LIMIT_WINDOW_MS }
+    );
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many tracking events' },
+        { status: 429, headers: rateLimitHeaders(rateLimit) }
+      );
+    }
+
+    const body = parsedBody;
     const supabase = await createClient();
-    const eventType = body.event_type as string;
+    const { data: { user } } = await supabase.auth.getUser();
+    const authUserId = user?.id ?? null;
+    const eventType = readString(body.event_type, 64) || '';
 
     if (body.batch && Array.isArray(body.events)) {
-      const standardEvents = body.events.filter((e: Record<string, unknown>) => !CUSTOM_EVENT_TYPES.includes(e.event_type as string));
-      const customEvents = body.events.filter((e: Record<string, unknown>) => CUSTOM_EVENT_TYPES.includes(e.event_type as string));
+      if (body.events.length > MAX_BATCH_EVENTS) {
+        return NextResponse.json(
+          { error: `Batch cannot exceed ${MAX_BATCH_EVENTS} events` },
+          { status: 413, headers: rateLimitHeaders(rateLimit) }
+        );
+      }
+
+      const cleanEvents = body.events.filter(isRecord);
+      if (cleanEvents.length !== body.events.length) {
+        return NextResponse.json(
+          { error: 'Invalid tracking payload' },
+          { status: 400, headers: rateLimitHeaders(rateLimit) }
+        );
+      }
+
+      const standardEvents = cleanEvents.filter((e) => !CUSTOM_EVENT_TYPES.includes(readString(e.event_type, 64) || ''));
+      const customEvents = cleanEvents.filter((e) => CUSTOM_EVENT_TYPES.includes(readString(e.event_type, 64) || ''));
 
       let standardCount = 0;
       let customCount = 0;
@@ -133,7 +252,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (customEvents.length > 0) {
-        const customRecords = customEvents.map(parseCustomEvent);
+        const customRecords = customEvents.map((event) => parseCustomEvent(event, authUserId));
         const { error } = await supabase
           .from('custom_events')
           .insert(customRecords);
@@ -144,11 +263,14 @@ export async function POST(req: NextRequest) {
         customCount = customRecords.length;
       }
 
-      return NextResponse.json({ success: true, standard: standardCount, custom: customCount });
+      return NextResponse.json(
+        { success: true, standard: standardCount, custom: customCount },
+        { headers: rateLimitHeaders(rateLimit) }
+      );
     }
 
     if (CUSTOM_EVENT_TYPES.includes(eventType)) {
-      const customRecord = parseCustomEvent(body);
+      const customRecord = parseCustomEvent(body, authUserId);
       const { error } = await supabase
         .from('custom_events')
         .insert([customRecord]);
@@ -158,14 +280,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to track custom event' }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, custom: true });
+      return NextResponse.json(
+        { success: true, custom: true },
+        { headers: rateLimitHeaders(rateLimit) }
+      );
     }
 
     const eventRecord = parseEvent(body);
-
-    if (!eventRecord.event_type) {
-      return NextResponse.json({ error: 'event_type required' }, { status: 400 });
-    }
 
     if (eventRecord.event_id) {
       try {
@@ -177,7 +298,10 @@ export async function POST(req: NextRequest) {
           .limit(1);
 
         if (existing && existing.length > 0) {
-          return NextResponse.json({ success: true, deduplicated: true });
+          return NextResponse.json(
+            { success: true, deduplicated: true },
+            { headers: rateLimitHeaders(rateLimit) }
+          );
         }
       } catch (err) {
         console.warn('[Track] Deduplication skipped:', err);
@@ -193,8 +317,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to track event' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rateLimit) });
   } catch (error) {
+    if (error instanceof TrackValidationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('[Track] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
@@ -202,28 +330,20 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const moderatorAuth = await requireModerator();
+    if (moderatorAuth.error) return moderatorAuth.error;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin' && profile?.role !== 'moderator') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
+    const { supabase } = moderatorAuth;
     const { searchParams } = new URL(req.url);
-    const eventType = searchParams.get('event_type');
+    const rawEventType = searchParams.get('event_type');
+    const eventType = rawEventType && EVENT_TYPE_PATTERN.test(rawEventType) ? rawEventType : null;
     const customOnly = searchParams.get('custom') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100', 10) || 100, 1), 500);
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+
+    if (rawEventType && !eventType) {
+      return NextResponse.json({ error: 'Invalid event_type' }, { status: 400 });
+    }
 
     if (customOnly) {
       let query = supabase

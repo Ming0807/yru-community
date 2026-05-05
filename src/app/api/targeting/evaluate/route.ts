@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = getAdminClient();
     const { searchParams } = new URL(req.url);
 
     const userId = searchParams.get('user_id');
@@ -14,12 +16,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
     }
 
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const canEvaluate = user.id === userId || profile?.role === 'admin' || profile?.role === 'moderator';
+    if (!canEvaluate) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const context = {
       timestamp: new Date().toISOString(),
       url_path: searchParams.get('url') || null,
     };
 
-    const { data: matchingRules, error } = await supabase
+    const { data: matchingRules, error } = await adminClient
       .rpc('get_matching_rules_for_user', {
         p_user_id: userId,
         p_campaign_id: campaignId || null,

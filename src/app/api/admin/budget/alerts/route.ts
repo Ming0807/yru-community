@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireModerator } from '@/lib/admin-auth';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
     if ('error' in auth) return auth.error;
 
     const supabase = auth.supabase;
+    const adminClient = getAdminClient();
     const body = await req.json();
     const { action, campaign_id, alert_id } = body;
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'campaign_id required' }, { status: 400 });
       }
 
-      const { error: funcError } = await supabase.rpc('generate_budget_alerts', {
+      const { error: funcError } = await adminClient.rpc('generate_budget_alerts', {
         p_campaign_id: campaign_id
       });
 
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'alert_id required' }, { status: 400 });
       }
 
-      const { error: ackError } = await supabase.rpc('acknowledge_budget_alert', {
+      const { error: ackError } = await adminClient.rpc('acknowledge_budget_alert', {
         p_alert_id: alert_id,
         p_user_id: auth.user.id
       });
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
         .in('status', ['active', 'approved']);
 
       for (const campaign of campaigns || []) {
-        await supabase.rpc('generate_budget_alerts', {
+        await adminClient.rpc('generate_budget_alerts', {
           p_campaign_id: campaign.id
         });
       }

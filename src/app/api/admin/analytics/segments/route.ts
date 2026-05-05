@@ -1,31 +1,17 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
 try {
-const supabase = await createClient();
+const auth = await requireAdmin();
+if ('error' in auth) return auth.error;
+
 const adminClient = getAdminClient();
 const { searchParams } = new URL(req.url);
     
     const segmentType = searchParams.get('type'); // activity, engagement, faculty, etc.
     const days = parseInt(searchParams.get('days') || '30', 10);
-
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     // Build query
     let query = adminClient

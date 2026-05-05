@@ -1,26 +1,14 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireModerator } from '@/lib/admin-auth';
 import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await requireModerator();
+  if (auth.error) return auth.error;
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin' && profile?.role !== 'moderator') {
-    return new Response('Forbidden', { status: 403 });
-  }
+  const { supabase } = auth;
 
   const encoder = new TextEncoder();
   let intervalId: ReturnType<typeof setInterval>;
@@ -36,29 +24,25 @@ export async function GET(request: NextRequest) {
         try {
           const now = new Date();
           const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-          const todayStart = new Date(now.setHours(0, 0, 0, 0));
+          const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+          const todayStart = new Date(now);
+          todayStart.setHours(0, 0, 0, 0);
 
           const [
             { count: totalUsers },
             { count: newUsers },
             { count: totalPosts },
-            { data: recentPosts },
-            { data: recentEvents },
+            { count: postsLastHour },
+            { count: eventsLastHour },
+            { count: activeNow },
           ] = await Promise.all([
             supabase.from('profiles').select('*', { count: 'exact', head: true }),
             supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
             supabase.from('posts').select('*', { count: 'exact', head: true }),
-            supabase.from('posts').select('created_at, user_id').gte('created_at', oneHourAgo.toISOString()),
-            supabase.from('user_analytics_events').select('event_type, created_at').gte('created_at', oneHourAgo.toISOString()),
+            supabase.from('posts').select('*', { count: 'exact', head: true }).gte('created_at', oneHourAgo.toISOString()),
+            supabase.from('user_analytics_events').select('*', { count: 'exact', head: true }).gte('created_at', oneHourAgo.toISOString()),
+            supabase.from('user_analytics_events').select('*', { count: 'exact', head: true }).gte('created_at', fiveMinutesAgo.toISOString()),
           ]);
-
-          const postsLastHour = recentPosts?.length || 0;
-          const eventsLastHour = recentEvents?.length || 0;
-
-          const activeNow = (recentEvents || []).filter((e: { created_at: string }) => {
-            const eventTime = new Date(e.created_at).getTime();
-            return now.getTime() - eventTime < 5 * 60 * 1000;
-          }).length;
 
           const payload = {
             timestamp: now.toISOString(),

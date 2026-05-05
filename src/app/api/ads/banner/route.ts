@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { selectAd, RotatableAd } from '@/lib/ads/rotation';
 
 export async function GET(request: Request) {
@@ -8,6 +9,7 @@ export async function GET(request: Request) {
     const position = searchParams.get('position') || 'banner';
     
     const supabase = await createClient();
+    const adminClient = getAdminClient();
     
     // 1. Get current user for targeting (Optional but recommended)
     const { data: { user } } = await supabase.auth.getUser();
@@ -53,17 +55,17 @@ export async function GET(request: Request) {
     if (userId) {
       try {
         // Use RPC to get matching rules and their effects (Bid Adjustments)
-        const { data: targetingResults, error: targetError } = await supabase
+        const { data: targetingResults, error: targetError } = await adminClient
           .rpc('apply_targeting_rules', {
             p_user_id: userId,
             p_context: { 
               device_type: request.headers.get('user-agent')?.includes('Mobile') ? 'mobile' : 'desktop',
               hour: new Date().getHours()
             }
-          });
+        });
 
         if (!targetError && targetingResults) {
-          const { bid_adjustment, targeting_labels } = targetingResults;
+          const { bid_adjustment } = targetingResults;
           
           // Apply bid adjustment to all ads that match targeting criteria
           // In a more complex setup, we'd check if specific ads match specific rules
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
             weight: ad.weight! * (bid_adjustment || 1.0)
           }));
         }
-      } catch (err) {
+      } catch {
         console.warn('[Banner API] Targeting evaluation failed, falling back to even rotation');
       }
     }
@@ -83,7 +85,7 @@ export async function GET(request: Request) {
     
     for (const ad of processedAds) {
       if (userId) {
-        const { data: freqCheck } = await supabase.rpc('check_ad_frequency_cap', {
+        const { data: freqCheck } = await adminClient.rpc('check_ad_frequency_cap', {
           p_ad_id: ad.id,
           p_user_identifier: userId,
           p_max_views: 5, // Default cap, could be dynamic from targeting rules

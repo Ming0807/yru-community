@@ -1,12 +1,14 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 type AttributionModel = 'last_click' | 'first_click' | 'linear' | 'time_decay' | 'u_shaped' | 'position_based';
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if ('error' in auth) return auth.error;
+
     const adminClient = getAdminClient();
     const { searchParams } = new URL(request.url);
 
@@ -14,22 +16,6 @@ export async function GET(request: Request) {
     const campaignId = searchParams.get('campaign_id');
     const days = parseInt(searchParams.get('days') || '30', 10);
     const windowDays = parseInt(searchParams.get('window') || '30', 10);
-
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     // Date range
     const endDate = new Date();
@@ -67,9 +53,6 @@ export async function GET(request: Request) {
       console.error('Error fetching conversions:', error);
       return NextResponse.json({ error: 'Failed to fetch conversions' }, { status: 500 });
     }
-
-// Build touchpoint map for proper attribution
-    const touchpointMap = new Map<string, { ad_id: string; created_at: string; type: 'click' | 'impression'; time_to_conv?: number }[]>();
 
     // Collect all impression touchpoints within the attribution window
     const { data: impressionTouchpoints } = await adminClient
@@ -114,7 +97,7 @@ export async function GET(request: Request) {
   for (const conv of conversions || []) {
     // Attribution based on model
     let creditedAdId = conv.ad_id;
-    let creditedCampaignId = conv.campaign_id;
+    const creditedCampaignId = conv.campaign_id;
     let credit = 1.0;
 
     if (model === 'first_click') {
@@ -153,7 +136,6 @@ export async function GET(request: Request) {
         credit = 0.5; // 50% each
       } else {
         const firstLastWeight = 0.4;
-        const middleWeight = 0.2 / (userJourney.length - 2);
         // For simplicity, attribute 40% to first, 20% to last, spread middle
         creditedAdId = userJourney[0].ad_id; // First touch gets primary credit
         credit = firstLastWeight;

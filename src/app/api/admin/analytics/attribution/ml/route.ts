@@ -1,10 +1,12 @@
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if ('error' in auth) return auth.error;
+
     const adminClient = getAdminClient();
     const { searchParams } = new URL(req.url);
 
@@ -12,21 +14,6 @@ export async function GET(req: NextRequest) {
     const campaignId = searchParams.get('campaign_id');
     const days = parseInt(searchParams.get('days') || '30', 10);
     const train = searchParams.get('train') === 'true';
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin' && profile?.role !== 'moderator') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const endDate = new Date();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -130,25 +117,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const auth = await requireAdmin();
+    if ('error' in auth) return auth.error;
+
     const adminClient = getAdminClient();
     const body = await req.json();
-    const { action, model, start_date, end_date } = body;
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { action, start_date, end_date } = body;
 
     if (action === 'train') {
       const startDate = start_date ? new Date(start_date) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
