@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 export function PWARegistration() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    let updateInterval: ReturnType<typeof setInterval> | null = null;
 
     // Register service worker
     if ('serviceWorker' in navigator) {
@@ -17,7 +16,7 @@ export function PWARegistration() {
           console.log('[PWA] Service worker registered:', registration.scope);
 
           // Check for updates periodically (every 30 minutes)
-          setInterval(() => {
+          updateInterval = setInterval(() => {
             registration.update();
           }, 30 * 60 * 1000);
         })
@@ -28,26 +27,22 @@ export function PWARegistration() {
 
     // Check if already installed as PWA
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) {
-      setIsInstalled(true);
-      return;
-    }
-
     // Listen for beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
     };
-    window.addEventListener('beforeinstallprompt', handler);
 
     // Listen for app installed
-    const installedHandler = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    };
-    window.addEventListener('appinstalled', installedHandler);
+    const installedHandler = () => {};
+    if (!isStandalone) {
+      window.addEventListener('beforeinstallprompt', handler);
+      window.addEventListener('appinstalled', installedHandler);
+    }
 
     return () => {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', installedHandler);
     };

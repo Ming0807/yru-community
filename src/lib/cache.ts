@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface CachedQueryOptions {
   cacheKey: string;
@@ -10,7 +9,7 @@ interface CachedQueryOptions {
 }
 
 export async function withCache<T>(
-  supabase: any,
+  supabase: SupabaseClient,
   options: CachedQueryOptions,
   queryFn: () => Promise<T>
 ): Promise<T> {
@@ -23,13 +22,21 @@ export async function withCache<T>(
 
   const { data: cached, error } = await supabase
     .from('query_cache')
-    .select('cache_data')
+    .select('cache_data, hit_count')
     .eq('cache_key', cacheKey)
     .gt('expires_at', new Date().toISOString())
     .single();
 
   if (!error && cached) {
-    await supabase.rpc('invalidate_cache', { p_cache_key: cacheKey });
+    const nextHitCount = ((cached.hit_count as number | null) || 0) + 1;
+    await supabase
+      .from('query_cache')
+      .update({
+        hit_count: nextHitCount,
+        last_hit_at: new Date().toISOString(),
+      })
+      .eq('cache_key', cacheKey);
+
     return cached.cache_data as T;
   }
 
@@ -51,7 +58,10 @@ export async function withCache<T>(
   return data;
 }
 
-export function generateCacheKey(prefix: string, params: Record<string, any>): string {
+export function generateCacheKey(
+  prefix: string,
+  params: Record<string, string | number | boolean | null | undefined>
+): string {
   const sortedParams = Object.keys(params).sort()
     .filter(k => params[k] !== undefined && params[k] !== null)
     .map(k => `${k}=${params[k]}`)
