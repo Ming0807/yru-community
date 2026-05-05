@@ -45,12 +45,11 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           <Link href={`/profile/${post.author.id}`} onClick={(e) => e.stopPropagation()} prefetch={false}>
             <div className="flex items-center gap-1.5 font-medium text-foreground py-0.5 hover:text-(--color-yru-pink) hover:underline transition-all">
               {post.author.avatar_url ? (
-                <Image
+                <img
                   src={post.author.avatar_url}
                   alt=""
                   width={24}
                   height={24}
-                  sizes="24px"
                   className="w-6 h-6 rounded-full object-cover ring-1 ring-border/50 transition-all group-hover:ring-2 group-hover:ring-(--color-yru-pink)/30"
                 />
               ) : (
@@ -75,9 +74,9 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           </Badge>
         )}
 
-        <span className="ml-auto flex items-center gap-1.5 opacity-60" suppressHydrationWarning>
+        <span className="ml-auto flex items-center gap-1.5 opacity-60">
           <Clock className="h-3 w-3" />
-          {relativeTime}
+          <span suppressHydrationWarning>{relativeTime}</span>
         </span>
       </div>
 

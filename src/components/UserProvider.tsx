@@ -67,108 +67,138 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = useCallback(async () => {
     const supabase = createClient();
-
-    // ── Step 1: Fast session check (reads from browser cookie, ~0ms) ──────
-    const { data: { session } } = await supabase.auth.getSession();
-    const authUser = session?.user ?? null;
-
-    if (!authUser) {
-      // Definitely not logged in — unblock the UI immediately, no spinner.
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
-    // ── Step 2: Show cached profile instantly (zero flash) ─────────────────
-    const cached = getCachedProfile(authUser.id);
-    if (cached) {
-      setUser(cached);
-      setLoading(false); // UI unblocked from cache — user sees profile right away
-    }
-
-    // ── Step 3: Fetch fresh profile from DB in background ──────────────────
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const authUser = session?.user ?? null;
+      
+      if (!authUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      
+      const cached = getCachedProfile(authUser.id);
+      if (cached) {
+        setUser(cached);
+        setLoading(false);
+      }
+      
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single();
-
+        .maybeSingle();
+        
       if (profile) {
         setUser(profile);
-        setCachedProfile(profile); // update cache with latest data
+        setCachedProfile(profile);
       } else if (!cached) {
-        setUser(null); // no profile and no cache → show login
+        setUser(null);
       }
     } catch (err) {
       console.error('[UserProvider] Profile fetch error:', err);
-      // Keep the cached version if available rather than flashing login
     } finally {
-      setLoading(false); // ensure UI is always unblocked
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchProfile();
-
+    let mounted = true;
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        // INITIAL_SESSION fires on first mount and is handled entirely
-        // by fetchProfile() above. We must NOT call setLoading(false) here
-        // because fetchProfile() may still be mid-fetch, and unblocking
-        // early would flash the login button while user === null.
-        if (event === 'INITIAL_SESSION') return;
+    let subscription: { unsubscribe: () => void } | null = null;
 
-        if (event === 'SIGNED_OUT' || !session?.user) {
-          setUser(null);
-          setLoading(false);
-          clearProfileCache();
-          return;
-        }
+    async function initAuth() {
+      try {
+        // 1. Fetch session explicitly so SSR cookies are read
+        const { data: { session } } = await supabase.auth.getSession();
+        const authUser = session?.user ?? null;
 
-        if (event === 'SIGNED_IN') {
-          // After login redirect: check cache first for instant display,
-          // THEN fetch fresh profile, and only unblock loading after we
-          // have the user data — this eliminates the login button flash.
-          const cached = getCachedProfile(session.user.id);
-          if (cached) {
+        if (!authUser) {
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
+        } else {
+          // Show cached profile instantly
+          const cached = getCachedProfile(authUser.id);
+          if (cached && mounted) {
             setUser(cached);
             setLoading(false);
           }
+
+          // Fetch fresh profile
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', session.user.id)
-            .single();
-          if (profile) {
-            setUser(profile);
-            setCachedProfile(profile);
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          if (mounted) {
+            if (profile) {
+              setUser(profile);
+              setCachedProfile(profile);
+            } else if (!cached) {
+              setUser(null);
+            }
+            setLoading(false);
           }
-          setLoading(false);
-          return;
         }
 
-        if (event === 'TOKEN_REFRESHED') {
-          // Silent background token refresh — update profile without
-          // touching the loading state (UI should already be stable).
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          if (profile) {
-            setUser(profile);
-            setCachedProfile(profile);
+        if (!mounted) return;
+
+        // 2. Subscribe to auth changes AFTER initial session is loaded
+        // This prevents navigator.locks contention between getSession and onAuthStateChange
+        const { data } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, currentSession: Session | null) => {
+          if (event === 'INITIAL_SESSION') return; // Already handled manually
+
+          if (event === 'SIGNED_OUT' || !currentSession?.user) {
+            setUser(null);
+            setLoading(false);
+            clearProfileCache();
+            return;
           }
-        }
+
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', currentSession.user.id)
+                .maybeSingle();
+                
+              if (profile) {
+                setUser(profile);
+                setCachedProfile(profile);
+              } else {
+                setUser(null);
+              }
+            } catch (err) {
+              console.error(`[UserProvider] Profile fetch error (${event}):`, err);
+            } finally {
+              setLoading(false);
+            }
+          }
+        });
+        subscription = data.subscription;
+      } catch (err) {
+        console.error('[UserProvider] Auth initialization error:', err);
+        if (mounted) setLoading(false);
       }
-    );
+    }
 
-    // ── bfcache restore handler ─────────────────────────────────────────────
-    // When the user presses the browser Back button, the browser may restore
-    // the page from bfcache (a frozen snapshot). The auth state in that snapshot
-    // may be stale. We listen for the `pageshow` event and re-sync if needed.
+    initAuth();
+
+    return () => {
+      mounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
+  }, []);
+
+  // ── bfcache restore handler ─────────────────────────────────────────────
+  // When the user presses the browser Back button, the browser may restore
+  // the page from bfcache (a frozen snapshot). The auth state in that snapshot
+  // may be stale. We listen for the `pageshow` event and re-sync if needed.
+  useEffect(() => {
     const handlePageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         // Page was restored from bfcache — re-fetch to sync auth state
@@ -178,7 +208,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     window.addEventListener('pageshow', handlePageShow);
 
     return () => {
-      subscription.unsubscribe();
       window.removeEventListener('pageshow', handlePageShow);
     };
   }, [fetchProfile]);
