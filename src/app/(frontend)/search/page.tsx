@@ -15,6 +15,14 @@ interface SearchPageProps {
   searchParams: Promise<{ q?: string; category?: string; sort?: string; date?: string; author?: string }>;
 }
 
+function normalizeSearchTerm(value: string): string {
+  return value
+    .trim()
+    .replace(/[\u0000-\u001F%_,()"'\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
 export async function generateMetadata({
   searchParams,
 }: SearchPageProps): Promise<Metadata> {
@@ -42,15 +50,22 @@ async function SearchResults({
   let dbQuery = supabase
     .from('posts')
     .select('*, author:profiles!posts_author_id_fkey(id, display_name, avatar_url, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
-    .eq('is_draft', false);
+    .eq('is_draft', false)
+    .is('deleted_at', null);
 
   if (query) {
-    dbQuery = dbQuery.or(`title.ilike.%${query}%,content_text.ilike.%${query}%`);
+    const safeQuery = normalizeSearchTerm(query);
+    if (safeQuery) {
+      dbQuery = dbQuery.or(`title.ilike.%${safeQuery}%,content_text.ilike.%${safeQuery}%`);
+    }
   }
 
   // Author filter
   if (author) {
-    dbQuery = dbQuery.ilike('author.display_name', `%${author}%`);
+    const safeAuthor = normalizeSearchTerm(author);
+    if (safeAuthor) {
+      dbQuery = dbQuery.ilike('author.display_name', `%${safeAuthor}%`);
+    }
   }
 
   // Category filter

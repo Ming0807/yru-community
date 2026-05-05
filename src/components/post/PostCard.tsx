@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // 1. นำเข้า useState, useEffect
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MessageCircle, ArrowBigUp, Eye, Clock, Pin } from 'lucide-react';
@@ -9,13 +9,6 @@ import { timeAgo } from '@/lib/utils';
 import { CATEGORIES } from '@/lib/constants';
 import type { Post } from '@/types';
 
-// Badge levels based on user activity
-const getUserBadge = (author?: Post['author']) => {
-  if (!author) return null;
-  // Simple badge system - can be extended with real EXP data
-  return null; // Will be implemented when profiles have EXP columns
-};
-
 interface PostCardProps {
   post: Post;
   index?: number; // For staggered animation
@@ -23,14 +16,6 @@ interface PostCardProps {
 
 export default function PostCard({ post, index = 0 }: PostCardProps) {
   const router = useRouter();
-  
-  // 2. สร้าง State เช็กว่าหน้าเว็บโหลดฝั่ง Client เสร็จหรือยัง
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const category = CATEGORIES.find(
     (c) => c.slug === post.category?.slug
   ) ?? post.category;
@@ -40,6 +25,8 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
   };
 
   const animationDelay = `${Math.min(index * 50, 300)}ms`;
+  const thumbnail = post.attachments?.find((attachment) => attachment.type === 'image');
+  const relativeTime = timeAgo(post.created_at);
 
   return (
     <article 
@@ -58,10 +45,13 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           <Link href={`/profile/${post.author.id}`} onClick={(e) => e.stopPropagation()} prefetch={false}>
             <div className="flex items-center gap-1.5 font-medium text-foreground py-0.5 hover:text-(--color-yru-pink) hover:underline transition-all">
               {post.author.avatar_url ? (
-                <img 
-                  src={post.author.avatar_url} 
-                  alt="" 
-                  className="w-6 h-6 rounded-full object-cover ring-1 ring-border/50 transition-all group-hover:ring-2 group-hover:ring-(--color-yru-pink)/30" 
+                <Image
+                  src={post.author.avatar_url}
+                  alt=""
+                  width={24}
+                  height={24}
+                  sizes="24px"
+                  className="w-6 h-6 rounded-full object-cover ring-1 ring-border/50 transition-all group-hover:ring-2 group-hover:ring-(--color-yru-pink)/30"
                 />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-(--color-yru-pink)/10 text-(--color-yru-pink) flex items-center justify-center text-[10px] font-bold">
@@ -85,10 +75,9 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           </Badge>
         )}
 
-        {/* 3. เช็ก isMounted ตรงนี้! ถ้ายืนยันว่าฝั่ง Client พร้อมแล้วค่อยคำนวณเวลา */}
-        <span className="ml-auto flex items-center gap-1.5 opacity-60">
+        <span className="ml-auto flex items-center gap-1.5 opacity-60" suppressHydrationWarning>
           <Clock className="h-3 w-3" />
-          {isMounted ? timeAgo(post.created_at) : '...'}
+          {relativeTime}
         </span>
       </div>
 
@@ -124,11 +113,14 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
         </div>
 
         {/* Thumbnail */}
-        {post.attachments && post.attachments.some(a => a.type === 'image') && (
+        {thumbnail && (
           <div className="shrink-0 transition-transform duration-300 group-hover:scale-[1.02]">
-            <img
-              src={post.attachments.find(a => a.type === 'image')?.url}
+            <Image
+              src={thumbnail.url}
               alt=""
+              width={96}
+              height={96}
+              sizes="(max-width: 640px) 80px, 96px"
               className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-border/40 shadow-sm"
             />
           </div>

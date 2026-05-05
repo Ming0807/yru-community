@@ -1,9 +1,7 @@
-import Link from 'next/link';
-import PostCard from '@/components/post/PostCard';
 import InfiniteFeed from '@/components/post/InfiniteFeed';
 import { createClient } from '@/lib/supabase/server';
 import { POSTS_PER_PAGE } from '@/lib/constants';
-import type { Post, SortOption } from '@/types';
+import type { Ad, Post, SortOption } from '@/types';
 
 interface FeedProps {
   sort: SortOption;
@@ -18,14 +16,8 @@ export default async function Feed({ sort, page }: FeedProps) {
   let query = supabase
     .from('posts')
     .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)', { count: 'exact' })
-    .eq('is_draft', false);
-
-  // Filter out soft-deleted posts (only if column exists)
-  try {
-    query = query.is('deleted_at', null);
-  } catch {
-    // Column doesn't exist yet, skip filter
-  }
+    .eq('is_draft', false)
+    .is('deleted_at', null);
 
   // Sort
   query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
@@ -44,8 +36,6 @@ export default async function Feed({ sort, page }: FeedProps) {
 
   if (error) {
     console.error('[Feed] Query error:', error);
-  } else {
-    console.log(`[Feed] Loaded ${posts?.length || 0} posts, total: ${count}`);
   }
 
   // Fetch active feed ads
@@ -60,7 +50,7 @@ export default async function Feed({ sort, page }: FeedProps) {
       initialPosts={(posts as Post[]) || []}
       totalCount={count ?? 0}
       sort={sort}
-      ads={(ads as any[]) || []}
+      ads={(ads as Ad[]) || []}
     />
   );
 }

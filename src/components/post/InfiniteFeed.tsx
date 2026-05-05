@@ -9,7 +9,6 @@ import { POSTS_PER_PAGE } from '@/lib/constants';
 import type { Post, SortOption, Ad } from '@/types';
 import { ChevronDown, Loader2, ArrowUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/components/UserProvider';
 
 interface InfiniteFeedProps {
   initialPosts: Post[];
@@ -21,10 +20,22 @@ interface InfiniteFeedProps {
 export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] }: InfiniteFeedProps) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [page, setPage] = useState(1);
+  const [loadedCount, setLoadedCount] = useState(initialPosts.length);
   const [isLoading, setIsLoading] = useState(false);
   const [newPosts, setNewPosts] = useState<Post[]>([]);
-  const { user } = useUser();
-  const supabase = createClient();
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const postsRef = useRef<Post[]>(initialPosts);
+
+  if (!supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+
+  const supabase = supabaseRef.current;
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
 
   useEffect(() => {
     const channel = supabase
@@ -36,15 +47,30 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
           schema: 'public',
           table: 'posts',
         },
-        (payload: { new: any }) => {
-          const newPost = payload.new as any;
-          if (sort === 'latest') {
-            setNewPosts((prev) => {
-              const exists = prev.some((p) => p.id === newPost.id);
-              if (exists) return prev;
-              return [newPost, ...prev];
-            });
+        async (payload: { new: { id?: string; is_draft?: boolean; deleted_at?: string | null } }) => {
+          if (sort !== 'latest' || !payload.new.id || payload.new.is_draft || payload.new.deleted_at) {
+            return;
           }
+
+          const { data, error } = await supabase
+            .from('posts')
+            .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
+            .eq('id', payload.new.id)
+            .eq('is_draft', false)
+            .is('deleted_at', null)
+            .single();
+
+          if (error || !data) {
+            console.warn('[Feed] Realtime post hydration skipped:', error);
+            return;
+          }
+
+          const hydratedPost = data as Post;
+          setNewPosts((prev) => {
+            const exists = prev.some((p) => p.id === hydratedPost.id) || postsRef.current.some((p) => p.id === hydratedPost.id);
+            if (exists) return prev;
+            return [hydratedPost, ...prev];
+          });
         }
       )
       .subscribe();
@@ -63,21 +89,22 @@ export default function InfiniteFeed({ initialPosts, totalCount, sort, ads = [] 
     setNewPosts([]);
   };
 
-  const hasMore = posts.length < totalCount;
+  const hasMore = loadedCount < totalCount;
 
   const loadMore = async () => {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
+    setLoadMoreError(null);
 
     try {
       const nextPage = page + 1;
       const offset = (nextPage - 1) * POSTS_PER_PAGE;
-      const supabase = createClient();
 
-let query = supabase
-      .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(*), category:categories!posts_category_id_fkey(*)')
-        .eq('is_draft', false);
+      let query = supabase
+        .from('posts')
+        .select('*, author:profiles!posts_author_id_fkey(display_name, avatar_url, id, faculty), category:categories!posts_category_id_fkey(id, name, slug, icon)')
+        .eq('is_draft', false)
+        .is('deleted_at', null);
 
       query = query.order('is_pinned', { ascending: false }); // Pinned posts always first
 
@@ -97,22 +124,21 @@ let query = supabase
       if (error) throw error;
 
       if (data && data.length > 0) {
+        const existingIds = new Set(postsRef.current.map((p: Post) => p.id));
+        const newUnique = (data as Post[]).filter((p: Post) => !existingIds.has(p.id));
+
         setPosts((prev) => {
-          // Filter out any duplicates just in case new posts were added while scrolling
-          const existingIds = new Set(prev.map((p: Post) => p.id));
-          const newUnique = (data as Post[]).filter((p: Post) => !existingIds.has(p.id));
-          return [...prev, ...newUnique];
+          const currentIds = new Set(prev.map((p: Post) => p.id));
+          return [...prev, ...newUnique.filter((p: Post) => !currentIds.has(p.id))];
         });
+        setLoadedCount((count) => count + newUnique.length);
         setPage(nextPage);
+      } else {
+        setLoadedCount(totalCount);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching more posts:', error);
-      // 🔥 For debugging: popup the exact error details to the user
-      if (error?.details) {
-        alert("FK Ambiguity Details: " + JSON.stringify(error.details));
-      } else if (error?.message) {
-        alert("Error: " + error.message);
-      }
+      setLoadMoreError('โหลดโพสต์เพิ่มเติมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setIsLoading(false);
     }
@@ -203,6 +229,12 @@ let query = supabase
               </>
             )}
           </Button>
+        </div>
+      )}
+
+      {loadMoreError && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-center text-sm text-destructive">
+          {loadMoreError}
         </div>
       )}
       

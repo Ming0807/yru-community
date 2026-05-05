@@ -1,14 +1,21 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Search, X, Clock, TrendingUp, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
 
 const RECENT_SEARCHES_KEY = 'yru_recent_searches';
 const MAX_RECENT = 5;
+
+interface SearchSuggestion {
+  id: string;
+  title: string;
+  created_at: string;
+  is_anonymous: boolean;
+  author: { display_name: string; avatar_url: string | null } | null;
+}
 
 function getRecentSearches(): string[] {
   if (typeof window === 'undefined') return [];
@@ -39,10 +46,11 @@ function SearchInput() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [isOpen, setIsOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<Array<{ id: string; title: string; created_at: string; is_anonymous: boolean; author: { display_name: string; avatar_url: string | null } | null }>>([]);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,50 +76,40 @@ function SearchInput() {
 
     setLoading(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
 
     debounceRef.current = setTimeout(async () => {
-      const supabase = createClient();
-      const searchTerm = `%${query.trim()}%`;
-      
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select('id, author_id, title, created_at, is_anonymous')
-        .or(`title.ilike.${searchTerm},content_text.ilike.${searchTerm}`)
-        .order('created_at', { ascending: false })
-        .limit(8);
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-      if (error) {
-        console.error('Search error:', error);
-        setSuggestions([]);
-        setLoading(false);
-        return;
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}&limit=8`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          setSuggestions([]);
+          return;
+        }
+
+        const data = await response.json() as { suggestions?: SearchSuggestion[] };
+        setSuggestions(data.suggestions || []);
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.warn('[Search] suggestions failed:', error);
+          setSuggestions([]);
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setLoading(false);
+        }
       }
-
-      if (!posts || posts.length === 0) {
-        setSuggestions([]);
-        setLoading(false);
-        return;
-      }
-
-      const authorIds = [...new Set(posts.map((p: { author_id: string }) => p.author_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', authorIds);
-
-      const profileMap = new Map((profiles || []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p]));
-      
-      const suggestionsWithAuthor = posts.map((post: { id: string; author_id: string; title: string; created_at: string; is_anonymous: boolean }) => ({
-        ...post,
-        author: profileMap.get(post.author_id) || null
-      }));
-      
-      setSuggestions(suggestionsWithAuthor);
-      setLoading(false);
     }, 400);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
     };
   }, [query]);
 
